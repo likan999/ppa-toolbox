@@ -1,0 +1,29 @@
+Source: toolbox
+Section: devel
+Priority: optional
+Maintainer: Debarshi Ray <rishi@fedoraproject.org>
+Build-Depends:
+ bash-completion,
+ debhelper-compat (= 9),
+ golang-go,
+ go-md2man,
+ meson,
+ pkg-config,
+ systemd
+Standards-Version: 4.5.0
+Homepage: https://github.com/containers/toolbox
+Vcs-Git: https://github.com/containers/toolbox.git
+Rules-Requires-Root: no
+
+Package: toolbox
+Architecture: any
+Depends:
+ bash,
+ flatpak,
+ podman,
+ ${shlibs:Depends},
+ ${misc:Depends}
+Description: Unprivileged development environment
+ Toolbox is offers a familiar RPM based environment for developing and
+ debugging software that runs fully unprivileged using Podman.
+

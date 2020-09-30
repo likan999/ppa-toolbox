@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+
+export HOME = $(CURDIR)
+export GOFLAGS = -mod=vendor
+
+%:
+	dh $@ --buildsystem meson --with bash-completion
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+	-Dprofile_dir=/etc/profile.d
+

@@ -1,0 +1,279 @@
+stable (0.0.95) stable; urgency=medium
+
+  * Try to handle configuration files that're absolute symlinks when the entry
+    point sets up the container
+  * Unbreak 'enter' on Fedora CoreOS
+  * Unbreak 'sudo' inside toolbox containers with Podman 2.0.5
+  * Warn if $TERM has no terminfo entry in the container
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Sun, 30 Aug 2020 22:40:16 +0200
+
+stable (0.0.94) stable; urgency=medium
+
+  * Add contribution guidelines
+  * Add fedora-toolbox image definition for Fedora 34
+  * Add more information to errors from creating symbolic links when setting up
+    the toolbox container in the entry point
+  * Ensure binaries built on Fedora 33 run on Fedoras 32 & 31
+  * Install the tests
+  * Make it more obvious when falling back to /bin/bash
+  * Document that sudo(8) should work without a password
+  * Mount a tmpfs at /tmp to match the host
+  * Update issue templates
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Mon, 24 Aug 2020 19:31:28 +0200
+
+stable (0.0.93) stable; urgency=medium
+
+  * Ensure reproducible builds by using the -trimpath build flag
+  * Fix the test suite to work with the Go implementation
+  * Make listing of containers and images more robust against changes in the JSON
+    returned by Podman
+  * List out dependencies and installation instructions
+  * Re-enable highlighting of running containers
+  * Show the spinner only when connected to a terminal
+  * Speed things up by caching the Podman version at runtime
+  * Update hint after creating a container to use the new syntax
+  * Use the correct verb format for string
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Fri, 24 Jul 2020 17:44:51 +0200
+
+stable (0.0.92) stable; urgency=medium
+
+  * Embed the version from Meson into the binary
+  * Make it build on aarch64
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Fri, 3 Jul 2020 15:54:02 +0200
+
+stable (0.0.91) stable; urgency=medium
+
+  * Add gvfs-client to the fedora-toolbox images
+  * Adjust for changes in JSON output from 'podman ps' and 'podman images' in
+    Podman 2.0
+  * Lower the Go build requirements to make it easier to build on Fedora
+  * Show an error if $PWD is missing inside the container
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Sat, 27 Jun 2020 16:27:02 +0200
+
+stable (0.0.90) stable; urgency=medium
+
+  * Rewrite Toolbox in Go
+  * Remove support for toolbox containers created by Toolbox 0.0.9 and older
+  * Add option --version to show current Toolbox version
+  * Add options --log-level and --log-podman as possible future replacements for
+    --verbose and --very-verbose
+  * Clean up the spinner when aborted by SIGINT (or ctrl+c) and such
+  * Fix duplication in the output of the list command
+  * Mark the reset command as deprecated (replaced by 'podman system reset')
+  * Support specifying the name of a toolbox container as an argument to the
+    create and enter commands, in addition to the --container option
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Thu, 14 May 2020 16:42:52 +0200
+
+stable (0.0.18) stable; urgency=medium
+
+  * Check /usr/share/profile.d when bind mounting toolbox.sh
+  * Mount /media only if it is available
+  * Set up /media and /mnt to match the host
+  * Unbreak 'enter' when SELinux is disabled
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Tue, 14 Jan 2020 15:47:45 +0100
+
+stable (0.0.17) stable; urgency=medium
+
+  * Add a --very-verbose or -vv option
+  * Deprecate all toolbox containers that don't use a reflexive entry point
+  * Ensure that 'run' has at least one argument for the command
+  * Give access to the host's systemd journal
+  * Wipe out the container's /sys/fs/selinux to not advertise SELinux
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Wed, 20 Nov 2019 18:08:03 +0100
+
+stable (0.0.16) stable; urgency=medium
+
+  * Add a reset command
+  * Document requirements for distro support
+  * Don't use a toolbox container until after it has been configured
+  * Drop the coloured heading from 'list'
+  * Miscellaneous fixes to Bash completion
+  * Remove the hidden --sudo option and the /etc/sudoers.d snippet
+  * Try to migrate to a supported OCI runtime if 'podman start' suggests so
+  * Unbreak 'run' if container lacks files that are redirected to the host
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Tue, 29 Oct 2019 16:09:44 +0100
+
+stable (0.0.15) stable; urgency=medium
+
+  * Be forgiving of a missing /etc/profile.d/toolbox.sh in 'run'
+  * Don't sanity check /etc/subgid and /etc/subuid when running as root
+  * Install only flatpak-spawn, not the rest of flatpak-xdg-utils, in the images
+  * Let the terminal know the active container only on some Fedora variants
+  * Rely on 'podman system migrate' always being present
+  * Simplify code by dropping compatibility with 'podman create' < 1.4.0
+  * Switch to using /usr/lib/os-release instead of /etc/os-release
+  * Unbreak 'create' on Silverblue
+  * Update default release to 30 when running on non-fedora hosts
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Mon, 30 Sep 2019 16:21:56 +0200
+
+stable (0.0.14) stable; urgency=medium
+
+  * Adjust the grep match pattern to be more specific
+  * Don't exit with a non-zero code from 'toolbox list -i'
+  * Expose a few more host locations inside the container under /run/host
+  * Give access to the system Flatpak directory
+  * Give access to the system libvirt instance
+  * Mount /run/media only if it is available
+  * Preserve the host's ulimits when creating toolbox containers
+  * Work around 'podman exec' resetting the terminal size to 80x24
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Wed, 18 Sep 2019 18:47:43 +0200
+
+stable (0.0.13) stable; urgency=medium
+
+  * Drop PackageKit-command-not-found from the images
+  * Improve the help or usage output
+  * Simplify code by taking advantage of 'podman create --userns=keep-id'
+  * Simplify code by taking advantage of 'podman exec --workdir ...'
+  * Tighten the Silverblue check for the welcome message
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Thu, 5 Sep 2019 15:03:34 +0200
+
+stable (0.0.12) stable; urgency=medium
+
+  * Create /run/.toolboxenv inside the toolbox container's entry point too
+  * Don't use 'podman cp' to copy toolbox.sh to old containers
+  * Drop the "immutable" term
+  * Unbreak /etc/localtime & /etc/timezone if /run/host/monitor is absent
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Mon, 22 Jul 2019 14:28:41 +0200
+
+stable (0.0.11) stable; urgency=medium
+
+  * Allow Qt applications to work without QT_X11_NO_MITSHM
+  * Check if /etc/subgid and /etc/subuid have entries for the user
+  * Give access to the entire /dev from the host operating system
+  * Keep /etc/host.conf, /etc/localtime and /etc/timezone synchronized with the
+    host
+  * Notify the terminal about the current toolbox container in use
+  * Prevent Podman from complaining about 'podman cp --pause=true ...'
+  * Unbreak rendering & wrapping of commands typed at an interactive prompt
+  * Unbreak setting up /home as a symbolic link
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Fri, 21 Jun 2019 16:31:50 +0200
+
+stable (0.0.10) stable; urgency=medium
+
+  * Add a run command
+  * Create /run/.toolboxenv in 'toolbox enter' for identification
+  * Drop the Buildah dependency and the user-specific customized image
+  * Keep /etc/hosts and /etc/resolv.conf synchronized with the host
+  * Migrate existing containers when Podman is updated
+  * Retain the PS1 across su(1) and sudo(8)
+  * Set the Kerberos credential cache type only if Kerberos is available
+  * Support column(1) from bsdmainutils
+  * Support 'sudo' as default sudo(8) group
+  * Use a magenta hexagon instead of &#128313; &#x1F539; in the PS1
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Tue, 21 May 2019 18:55:47 +0200
+
+stable (0.0.9) stable; urgency=medium
+
+  * Add Bash completion
+  * Allow connecting to Wayland displays other than "wayland-0"
+  * Ask for confirmation before downloading the base image
+  * Improve the onboarding experience
+  * Make it available inside the toolbox container
+  * Make 'toolbox enter' create or fall back to a container when possible
+  * Set TOOLBOX_CONTAINER in the environment to identify as a toolbox
+  * Set default release to 29 when running on non-fedora hosts
+  * Show welcome texts on interactive shells
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Tue, 30 Apr 2019 12:29:09 +0200
+
+stable (0.0.8) stable; urgency=medium
+
+  * Add label for tagging, not tied to the fedora-toolbox name
+  * Add short variants for various options in 'create' and 'enter'
+  * Ensure that names of toolbox containers don't have a colon
+  * Enable Travis
+  * Fix miscellaneous issues pointed out by https://www.shellcheck.net/
+  * Give access to Kerberos if KCM credential caches are being used
+  * Improve the onboarding experience
+  * Reduce the sizes of the images by removing temporary files created by DNF
+  * Use a lighter entry point than /bin/sh
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Fri, 12 Apr 2019 16:44:16 +0200
+
+stable (0.0.7) stable; urgency=medium
+
+  * Add fedora-toolbox image definition for Fedora 31
+  * Add flatpak-xdg-utils to Fedoras 29 and 30
+  * Add manuals
+  * Add rm and rmi commands
+  * Be more informative when creating the working container
+  * Clarify the error message if the toolbox container is not found
+  * Don't create volumes in the image for bind mounts from the host
+  * Fix miscellaneous issues pointed out by https://www.shellcheck.net/
+  * Give access to /dev/bus for control transfers from USB devices
+  * Give access to removable devices and other temporary mounts
+  * Lots of Bash-isms removed for POSIX correctness
+  * Make the --image flag override the base toolbox image, as documented
+  * Make the spinner more efficient
+  * Restore documentation removed from the base Fedora images
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Thu, 14 Mar 2019 14:06:57 +0100
+
+stable (0.0.6) stable; urgency=medium
+
+  * Add a list command
+  * Drop the "fedora" prefix and rename the project as just "toolbox"
+  * Fix typos pointed out by https://www.shellcheck.net/
+  * Lots of Bash-isms removed for POSIX correctness
+  * Make --container and --image command-specific options
+  * Make it work inside the toolbox container itself
+  * Shorten the prefix for debug and error messages
+  * Use the host's PID namespace for the toolbox container
+  * Use the standard error output for error messages
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Thu, 21 Feb 2019 19:47:56 +0100
+
+stable (0.0.5) stable; urgency=medium
+
+  * Give access to mounts under $HOME, and make autofs work
+  * Show a spinner when creating the toolbox
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Mon, 11 Feb 2019 14:17:47 +0000
+
+stable (0.0.4) stable; urgency=medium
+
+  * Avoid spooky root-like behaviour for non-root interactive shells
+  * Give access to the FUSE kernel module
+  * Improve the readability of the debug output
+  * Set up $HOME and /home to match the host
+  * Try to enter the same directory inside the toolbox
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Mon, 21 Jan 2019 15:29:43 +0100
+
+stable (0.0.3) stable; urgency=medium
+
+  * Clean up the Buildah working containers on error
+  * Unbreak creating the toolbox if the toolbox image already exists
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Fri, 4 Jan 2019 12:41:43 +0000
+
+stable (0.0.2) stable; urgency=medium
+
+  * Allow an 'F' or 'f' prefix when specifying the release
+  * Avoid a Bash-ism (ie. ==) and stick to POSIX (ie. =)
+  * Fallback to /bin/bash if $SHELL doesn't exist in the toolbox container
+  * Give access to the system D-Bus instance
+  * Make shm_open work
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Mon, 12 Nov 2018 14:49:04 +0000
+
+stable (0.0.1) stable; urgency=medium
+
+  * First preview release
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Fri, 19 Oct 2018 19:25:13 +0200
