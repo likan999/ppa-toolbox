@@ -1,3 +1,14 @@
+stable (0.0.96) stable; urgency=medium
+
+  * Don't break GNU Readline's ctrl-p shortcut
+  * Enable system tests on Fedora 33
+  * Fix containers with missing /media possibly due to a failed RPM transaction
+  * Give access to the udev database
+  * Unbreak X11 applications with GNOME 3.38
+  * Update default release to 31 for non-Fedora hosts
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Thu, 1 Oct 2020 20:02:57 +0200
+
 stable (0.0.95) stable; urgency=medium
 
   * Try to handle configuration files that're absolute symlinks when the entry
