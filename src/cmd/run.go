@@ -34,6 +34,7 @@ var (
 	runFlags struct {
 		container string
 		release   string
+		noTty     bool
 	}
 )
 
@@ -52,6 +53,12 @@ func init() {
 		"c",
 		"",
 		"Run command inside a toolbox container with the given name.")
+
+	flags.BoolVarP(&runFlags.noTty,
+		"no-tty",
+		"T",
+		false,
+		"Run command without allocating a pseudo-TTY.")
 
 	flags.StringVarP(&runFlags.release,
 		"release",
@@ -290,10 +297,13 @@ func runCommand(container string,
 
 	execArgs = append(execArgs, []string{
 		"--interactive",
-		"--tty",
 		"--user", currentUser.Username,
 		"--workdir", workingDirectory,
 	}...)
+
+	if !runFlags.noTty {
+		execArgs = append(execArgs, "--tty")
+	}
 
 	execArgs = append(execArgs, envOptions...)
 
