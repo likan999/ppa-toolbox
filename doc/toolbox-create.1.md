@@ -6,6 +6,7 @@ toolbox\-create - Create a new toolbox container
 ## SYNOPSIS
 **toolbox create** [*--candidate-registry*]
                [*--container NAME* | *-c NAME*]
+               [*--hostname HOSTNAME*]
                [*--image NAME* | *-i NAME*]
                [*--release RELEASE* | *-r RELEASE*]
 
@@ -40,6 +41,10 @@ registry at `registry.fedoraproject.org`.
 Assign a different NAME to the toolbox container. This is useful for creating
 multiple toolbox containers from the same base image, or for entirely
 customized containers from custom-built base images.
+
+**--hostname** HOSTNAME
+
+Create the toolbox container using the specified hostname (default: toolbox).
 
 **--image** NAME, **-i** NAME
 

@@ -43,6 +43,7 @@ const (
 var (
 	createFlags struct {
 		container string
+		hostname  string
 		image     string
 		release   string
 	}
@@ -70,6 +71,11 @@ func init() {
 		"c",
 		"",
 		"Assign a different name to the toolbox container.")
+
+	flags.StringVar(&createFlags.hostname,
+		"hostname",
+		"toolbox",
+		"Create the toolbox container using the specified hostname (default: toolbox).")
 
 	flags.StringVarP(&createFlags.image,
 		"image",
@@ -336,7 +342,7 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 		"create",
 		"--dns", "none",
 		"--env", toolboxPathEnvArg,
-		"--hostname", "toolbox",
+		"--hostname", createFlags.hostname,
 		"--ipc", "host",
 		"--label", "com.github.containers.toolbox=true",
 		"--label", "com.github.debarshiray.toolbox=true",
