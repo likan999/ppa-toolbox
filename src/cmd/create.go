@@ -191,6 +191,15 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 	toolboxPathEnvArg := "TOOLBOX_PATH=" + toolboxPath
 	toolboxPathMountArg := toolboxPath + ":/usr/bin/toolbox:ro"
 
+	logrus.Debug("Checking if 'podman create' supports '--mount type=devpts'")
+
+	var devPtsMount []string
+
+	if podman.CheckVersion("2.1.0") {
+		logrus.Debug("'podman create' supports '--mount type=devpts'")
+		devPtsMount = []string{"--mount", "type=devpts,destination=/dev/pts"}
+	}
+
 	logrus.Debug("Checking if 'podman create' supports '--ulimit host'")
 
 	var ulimitHost []string
@@ -206,13 +215,6 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 	}
 
 	dbusSystemSocketMountArg := dbusSystemSocket + ":" + dbusSystemSocket
-
-	flatpakHelperMonitorPath, err := utils.CallFlatpakSessionHelper()
-	if err != nil {
-		return err
-	}
-
-	flatpakHelperMonitorMountArg := flatpakHelperMonitorPath + ":/run/host/monitor"
 
 	homeDirEvaled, err := filepath.EvalSymlinks(currentUser.HomeDir)
 	if err != nil {
@@ -338,26 +340,31 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 		"--ipc", "host",
 		"--label", "com.github.containers.toolbox=true",
 		"--label", "com.github.debarshiray.toolbox=true",
+	}
+
+	createArgs = append(createArgs, devPtsMount...)
+
+	createArgs = append(createArgs, []string{
 		"--name", container,
 		"--network", "host",
 		"--no-hosts",
 		"--pid", "host",
 		"--privileged",
 		"--security-opt", "label=disable",
-	}
+	}...)
 
 	createArgs = append(createArgs, ulimitHost...)
 
 	createArgs = append(createArgs, []string{
 		"--userns=keep-id",
 		"--user", "root:root",
+		"--volume", "/boot:/run/host/boot:rslave",
 		"--volume", "/etc:/run/host/etc",
 		"--volume", "/dev:/dev:rslave",
 		"--volume", "/run:/run/host/run:rslave",
 		"--volume", "/tmp:/run/host/tmp:rslave",
 		"--volume", "/var:/run/host/var:rslave",
 		"--volume", dbusSystemSocketMountArg,
-		"--volume", flatpakHelperMonitorMountArg,
 		"--volume", homeDirMountArg,
 		"--volume", toolboxPathMountArg,
 		"--volume", usrMountArg,

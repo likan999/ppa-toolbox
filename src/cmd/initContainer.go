@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
-	"syscall"
+	"time"
 
 	"github.com/containers/toolbox/pkg/shell"
 	"github.com/containers/toolbox/pkg/utils"
+	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -56,6 +56,7 @@ var (
 		{"/run/udev/data", "/run/host/run/udev/data", ""},
 		{"/tmp", "/run/host/tmp", "rslave"},
 		{"/var/lib/flatpak", "/run/host/var/lib/flatpak", "ro"},
+		{"/var/lib/libvirt", "/run/host/var/lib/libvirt", ""},
 		{"/var/log/journal", "/run/host/var/log/journal", "ro"},
 		{"/var/mnt", "/run/host/var/mnt", "rslave"},
 	}
@@ -167,6 +168,19 @@ func initContainer(cmd *cobra.Command, args []string) error {
 				}
 			}
 
+			if localtimeTarget, err := os.Readlink("/etc/localtime"); err != nil ||
+				localtimeTarget != "/run/host/etc/localtime" {
+				if err := redirectPath("/etc/localtime",
+					"/run/host/etc/localtime",
+					false); err != nil {
+					return err
+				}
+			}
+
+			if err := updateTimeZoneFromLocalTime(); err != nil {
+				return err
+			}
+
 			if _, err := os.Readlink("/etc/resolv.conf"); err != nil {
 				if err := redirectPath("/etc/resolv.conf",
 					"/run/host/etc/resolv.conf",
@@ -183,26 +197,6 @@ func initContainer(cmd *cobra.Command, args []string) error {
 
 			if utils.PathExists("/sys/fs/selinux") {
 				if err := mountBind("/sys/fs/selinux", "/usr/share/empty", ""); err != nil {
-					return err
-				}
-			}
-		}
-
-		if utils.PathExists("/run/host/monitor") {
-			logrus.Debug("Path /run/host/monitor exists")
-
-			if localtimeTarget, err := os.Readlink("/etc/localtime"); err != nil ||
-				localtimeTarget != "/run/host/monitor/localtime" {
-				if err := redirectPath("/etc/localtime",
-					"/run/host/monitor/localtime", false); err != nil {
-					return err
-				}
-			}
-
-			if _, err := os.Readlink("/etc/timezone"); err != nil {
-				if err := redirectPath("/etc/timezone",
-					"/run/host/monitor/timezone",
-					false); err != nil {
 					return err
 				}
 			}
@@ -265,6 +259,30 @@ func initContainer(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	logrus.Debug("Setting up daily ticker")
+
+	daily, err := time.ParseDuration("24h")
+	if err != nil {
+		panicMsg := fmt.Sprintf("failed to parse duration: %v", err)
+		panic(panicMsg)
+	}
+
+	tickerDaily := time.NewTicker(daily)
+	defer tickerDaily.Stop()
+
+	logrus.Debug("Setting up watches for file system events")
+
+	watcherForHost, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+
+	defer watcherForHost.Close()
+
+	if err := watcherForHost.Add("/run/host/etc"); err != nil {
+		return err
+	}
+
 	logrus.Debug("Finished initializing container")
 
 	toolboxRuntimeDirectory := runtimeDirectory + "/toolbox"
@@ -295,22 +313,19 @@ func initContainer(cmd *cobra.Command, args []string) error {
 		return errors.New("failed to change ownership of initialization stamp")
 	}
 
-	logrus.Debug("Going to sleep")
+	logrus.Debug("Listening to file system and ticker events")
 
-	sleepBinary, err := exec.LookPath("sleep")
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return errors.New("sleep(1) not found")
+	go runUpdateDb()
+
+	for {
+		select {
+		case event := <-tickerDaily.C:
+			handleDailyTick(event)
+		case event := <-watcherForHost.Events:
+			handleFileSystemEvent(event)
+		case err := <-watcherForHost.Errors:
+			logrus.Warnf("Received an error from the file system watcher: %v", err)
 		}
-
-		return errors.New("failed to lookup sleep(1)")
-	}
-
-	sleepArgs := []string{"sleep", "+Inf"}
-	env := os.Environ()
-
-	if err := syscall.Exec(sleepBinary, sleepArgs, env); err != nil {
-		return errors.New("failed to invoke sleep(1)")
 	}
 
 	return nil
@@ -406,6 +421,24 @@ func configureUsers(targetUserUid int,
 	}
 
 	return nil
+}
+
+func handleDailyTick(event time.Time) {
+	eventString := event.String()
+	logrus.Debugf("Handling daily tick %s", eventString)
+
+	runUpdateDb()
+}
+
+func handleFileSystemEvent(event fsnotify.Event) {
+	eventOpString := event.Op.String()
+	logrus.Debugf("Handling file system event: operation %s on %s", eventOpString, event.Name)
+
+	if event.Name == "/run/host/etc/localtime" {
+		if err := updateTimeZoneFromLocalTime(); err != nil {
+			logrus.Warnf("Failed to handle changes to the host's /etc/localtime: %v", err)
+		}
+	}
 }
 
 func mountBind(containerPath, source, flags string) error {
@@ -506,6 +539,12 @@ func redirectPath(containerPath, target string, folder bool) error {
 	return nil
 }
 
+func runUpdateDb() {
+	if err := shell.Run("updatedb", nil, nil, nil); err != nil {
+		logrus.Warnf("Failed to run updatedb(8): %v", err)
+	}
+}
+
 func sanitizeRedirectionTarget(target string) string {
 	if !filepath.IsAbs(target) {
 		panic("target must be an absolute path")
@@ -552,4 +591,40 @@ func sanitizeRedirectionTarget(target string) string {
 	}
 
 	return target
+}
+
+func updateTimeZoneFromLocalTime() error {
+	localTimeEvaled, err := filepath.EvalSymlinks("/etc/localtime")
+	if err != nil {
+		return fmt.Errorf("failed to resolve /etc/localtime: %w", err)
+	}
+
+	logrus.Debugf("Resolved /etc/localtime to %s", localTimeEvaled)
+
+	const zoneInfoRoot = "/run/host/usr/share/zoneinfo"
+
+	if !strings.HasPrefix(localTimeEvaled, zoneInfoRoot) {
+		return errors.New("/etc/localtime points to unknown location")
+	}
+
+	timeZone, err := filepath.Rel(zoneInfoRoot, localTimeEvaled)
+	if err != nil {
+		return fmt.Errorf("failed to extract time zone: %w", err)
+	}
+
+	const etcTimeZone = "/etc/timezone"
+
+	if err := os.Remove(etcTimeZone); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove old %s: %w", etcTimeZone, err)
+		}
+	}
+
+	timeZoneBytes := []byte(timeZone + "\n")
+	err = ioutil.WriteFile(etcTimeZone, timeZoneBytes, 0664)
+	if err != nil {
+		return fmt.Errorf("failed to create new %s: %w", etcTimeZone, err)
+	}
+
+	return nil
 }

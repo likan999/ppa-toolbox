@@ -209,7 +209,7 @@ func runCommand(container string,
 		}
 	}
 
-	if _, err := utils.CallFlatpakSessionHelper(); err != nil {
+	if err := callFlatpakSessionHelper(container); err != nil {
 		return err
 	}
 
@@ -263,7 +263,7 @@ func runCommand(container string,
 				container)
 			fmt.Fprintf(os.Stderr, "Using /bin/bash instead.\n")
 
-			command = []string{"/bin/bash"}
+			command = []string{"/bin/bash", "-l"}
 		} else {
 			return fmt.Errorf("command %s not found in container %s", command[0], container)
 		}
@@ -365,6 +365,37 @@ func runHelp(cmd *cobra.Command, args []string) {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		return
 	}
+}
+
+func callFlatpakSessionHelper(container string) error {
+	logrus.Debugf("Inspecting mounts of container %s", container)
+
+	info, err := podman.Inspect("container", container)
+	if err != nil {
+		return fmt.Errorf("failed to inspect entry point of container %s", container)
+	}
+
+	var needsFlatpakSessionHelper bool
+
+	mounts := info["Mounts"].([]interface{})
+	for _, mount := range mounts {
+		destination := mount.(map[string]interface{})["Destination"].(string)
+		if destination == "/run/host/monitor" {
+			logrus.Debug("Requires org.freedesktop.Flatpak.SessionHelper")
+			needsFlatpakSessionHelper = true
+			break
+		}
+	}
+
+	if !needsFlatpakSessionHelper {
+		return nil
+	}
+
+	if _, err := utils.CallFlatpakSessionHelper(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func getEntryPointAndPID(container string) (string, int, error) {

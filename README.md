@@ -1,8 +1,15 @@
 <img src="data/logo/toolbox-logo-landscape.svg" alt="Toolbox logo landscape" width="800"/>
 
-[Toolbox](https://github.com/containers/toolbox) is a tool that offers a
-familiar package based environment for developing and debugging software that
-runs fully unprivileged using [Podman](https://podman.io/).
+[![Zuul](https://zuul-ci.org/gated.svg)](https://softwarefactory-project.io/zuul/t/local/builds?project=containers/toolbox)
+[![Daily Pipeline](https://img.shields.io/badge/zuul-periodic-informational)](https://softwarefactory-project.io/zuul/t/local/builds?project=containers%2Ftoolbox&pipeline=periodic)
+
+[![Arch Linux package](https://img.shields.io/archlinux/v/community/x86_64/toolbox)](https://www.archlinux.org/packages/community/x86_64/toolbox/)
+[![Fedora package](https://img.shields.io/fedora/v/toolbox/rawhide)](https://src.fedoraproject.org/rpms/toolbox/)
+
+[Toolbox](https://github.com/containers/toolbox) is a tool for Linux operating
+systems, which allows the use of containerized command line environments. It is
+built on top of [Podman](https://podman.io/) and other standard container
+technologies from [OCI](https://opencontainers.org/).
 
 The toolbox container is a fully *mutable* container; when you see
 `yum install ansible` for example, that's something you can do inside your
@@ -10,7 +17,7 @@ toolbox container, without affecting the base operating system.
 
 This is particularly useful on
 [OSTree](https://ostree.readthedocs.io/en/latest/) based operating systems like
-[CoreOS](https://coreos.fedoraproject.org/) and
+[Fedora CoreOS](https://coreos.fedoraproject.org/) and
 [Silverblue](https://silverblue.fedoraproject.org/).  The intention of these
 systems is to discourage installation of software on the host, and instead
 install software as (or in) containers.
@@ -27,18 +34,24 @@ operating system.
 ## Usage
 
 ### Create your toolbox container:
-```
+```console
 [user@hostname ~]$ toolbox create
-Created container: fedora-toolbox-30
+Created container: fedora-toolbox-33
 Enter with: toolbox enter
 [user@hostname ~]$
 ```
 This will create a container called `fedora-toolbox-<version-id>`.
 
 ### Enter the toolbox:
-```
+```console
 [user@hostname ~]$ toolbox enter
 ⬢[user@toolbox ~]$
+```
+
+### Remove a toolbox container:
+```console
+[user@hostname ~]$ toolbox rm fedora-toolbox-33
+[user@hostname ~]$
 ```
 
 ## Dependencies and Installation
@@ -55,7 +68,7 @@ The following dependencies enable various optional features:
 - bash-completion
 
 It can be built and installed as any other typical Meson-based project:
-```
+```console
 [user@hostname toolbox]$ meson -Dprofile_dir=/etc/profile.d builddir
 [user@hostname toolbox]$ ninja -C builddir
 [user@hostname toolbox]$ sudo ninja -C builddir install
@@ -134,8 +147,8 @@ or any such peculiarities.
 By default, Toolbox creates the container using an
 [OCI](https://www.opencontainers.org/) image called
 `<ID>-toolbox:<VERSION-ID>`, where `<ID>` and `<VERSION-ID>` are taken from the
-host's `/usr/lib/os-release`. For example, the default image on a Fedora 30
-host would be `fedora-toolbox:30`.
+host's `/usr/lib/os-release`. For example, the default image on a Fedora 33
+host would be `fedora-toolbox:33`.
 
 This default can be overridden by the `--image` option in `toolbox create`,
 but operating system distributors should provide an adequately configured
@@ -191,7 +204,7 @@ it will refuse images that aren't tagged with
 used by the maintainer of the image to indicate that they have read this
 document and tested that the image works with Toolbox. You can use the
 following snippet in a Dockerfile for this:
-```
+```Dockerfile
 LABEL com.github.containers.toolbox="true" \
       com.github.debarshiray.toolbox="true"
 ```

@@ -2,6 +2,12 @@
 
 load helpers
 
+@test "Start the 'running' container and check it started alright" {
+  run_podman --log-level debug start running
+
+  is_toolbox_ready running
+}
+
 @test "Echo 'Hello World' inside of the default container" {
   run_toolbox run echo "Hello World"
   # is "$output" "Hello World" "Should say 'Hello World'"
