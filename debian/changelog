@@ -1,3 +1,18 @@
+stable (0.0.97) stable; urgency=medium
+
+  * Allow X11 clients to run as root
+  * Color the output only when displaying on a terminal
+  * Don't rely on user D-Bus to track time zone configuration
+  * Enable running minikube on Silverblue
+  * Expose the host's /boot inside the container at /run/host
+  * Fix missing terminfo warning for Ubuntu containers
+  * Make locate(1) work inside toolbox containers
+  * Make pseudo-terminal devices be owned by the 'tty' group
+  * Rework test to check if a toolbox container started successfully
+  * Run a login shell when falling back to Bash during 'enter'
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Tue, 3 Nov 2020 20:15:39 +0100
+
 stable (0.0.96) stable; urgency=medium
 
   * Don't break GNU Readline's ctrl-p shortcut
