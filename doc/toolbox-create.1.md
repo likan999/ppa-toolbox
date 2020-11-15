@@ -9,6 +9,7 @@ toolbox\-create - Create a new toolbox container
                [*--hostname HOSTNAME*]
                [*--image NAME* | *-i NAME*]
                [*--release RELEASE* | *-r RELEASE*]
+               [*--volume BINDMOUNT*]...
 
 ## DESCRIPTION
 
@@ -55,6 +56,11 @@ is useful for creating containers from custom-built base images.
 
 Create a toolbox container for a different operating system RELEASE than the
 host.
+
+**--volume** BINDMOUNT
+
+Create the toolbox container with additional bind mounts. Use the same format as
+--volume of podman. Can be specified multiple times.
 
 ## EXAMPLES
 
