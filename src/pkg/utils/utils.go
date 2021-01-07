@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -173,6 +174,17 @@ func CreateErrorInvalidRelease(executableBase string) error {
 
 	errMsg := builder.String()
 	return errors.New(errMsg)
+}
+
+func EnsureXdgRuntimeDirIsSet(uid int) {
+	if xdgRuntimeDir, ok := os.LookupEnv("XDG_RUNTIME_DIR"); !ok {
+		logrus.Debug("XDG_RUNTIME_DIR is unset")
+
+		xdgRuntimeDir = fmt.Sprintf("/run/user/%d", uid)
+		os.Setenv("XDG_RUNTIME_DIR", xdgRuntimeDir)
+
+		logrus.Debugf("XDG_RUNTIME_DIR set to %s", xdgRuntimeDir)
+	}
 }
 
 func ForwardToHost() (int, error) {
@@ -337,6 +349,40 @@ func GetMountOptions(target string) (string, error) {
 	return mountOptions, nil
 }
 
+func GetRuntimeDirectory(targetUser *user.User) (string, error) {
+	uid, err := strconv.Atoi(targetUser.Uid)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert user ID to integer: %w", err)
+	}
+
+	var runtimeDirectory string
+
+	if uid == 0 {
+		runtimeDirectory = "/run"
+	} else {
+		runtimeDirectory = os.Getenv("XDG_RUNTIME_DIR")
+	}
+
+	toolboxRuntimeDirectory := path.Join(runtimeDirectory, "toolbox")
+	logrus.Debugf("Creating runtime directory %s", toolboxRuntimeDirectory)
+
+	if err := os.MkdirAll(toolboxRuntimeDirectory, 0700); err != nil {
+		wrapped_err := fmt.Errorf("failed to create runtime directory %s: %w",
+			toolboxRuntimeDirectory,
+			err)
+		return "", wrapped_err
+	}
+
+	if err := os.Chown(toolboxRuntimeDirectory, uid, uid); err != nil {
+		wrapped_err := fmt.Errorf("failed to change ownership of the runtime directory %s: %w",
+			toolboxRuntimeDirectory,
+			err)
+		return "", wrapped_err
+	}
+
+	return toolboxRuntimeDirectory, nil
+}
+
 // HumanDuration accepts a Unix time value and converts it into a human readable
 // string.
 //
@@ -452,10 +498,15 @@ func PathExists(path string) bool {
 }
 
 // IsContainerNameValid checks if the name of a container matches the right pattern
-func IsContainerNameValid(containerName string) (bool, error) {
+func IsContainerNameValid(containerName string) bool {
 	pattern := "^" + ContainerNameRegexp + "$"
 	matched, err := regexp.MatchString(pattern, containerName)
-	return matched, err
+	if err != nil {
+		panicMsg := fmt.Sprintf("failed to parse regular expression for container name: %v", err)
+		panic(panicMsg)
+	}
+
+	return matched
 }
 
 func IsInsideContainer() bool {

@@ -81,19 +81,19 @@ func init() {
 		"assumeyes",
 		"y",
 		false,
-		"Automatically answer yes for all questions.")
+		"Automatically answer yes for all questions")
 
 	persistentFlags.StringVar(&rootFlags.logLevel,
 		"log-level",
 		"error",
-		"Log messages at the specified level: trace, debug, info, warn, error, fatal or panic.")
+		"Log messages at the specified level: trace, debug, info, warn, error, fatal or panic")
 
 	persistentFlags.BoolVar(&rootFlags.logPodman,
 		"log-podman",
 		false,
-		"Show the log output of Podman. The log level is handled by the log-level option.")
+		"Show the log output of Podman. The log level is handled by the log-level option")
 
-	persistentFlags.CountVarP(&rootFlags.verbose, "verbose", "v", "Set log-level to 'debug'.")
+	persistentFlags.CountVarP(&rootFlags.verbose, "verbose", "v", "Set log-level to 'debug'")
 
 	rootCmd.SetHelpFunc(rootHelp)
 	rootCmd.SetUsageFunc(rootUsage)
@@ -226,10 +226,9 @@ func migrate() error {
 		return fmt.Errorf("failed to create configuration directory")
 	}
 
-	runtimeDirectory := os.Getenv("XDG_RUNTIME_DIR")
-	toolboxRuntimeDirectory := runtimeDirectory + "/toolbox"
-	if err := os.MkdirAll(toolboxRuntimeDirectory, 0700); err != nil {
-		return fmt.Errorf("failed to create runtime directory %s", toolboxRuntimeDirectory)
+	toolboxRuntimeDirectory, err := utils.GetRuntimeDirectory(currentUser)
+	if err != nil {
+		return err
 	}
 
 	migrateLock := toolboxRuntimeDirectory + "/migrate.lock"

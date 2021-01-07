@@ -71,7 +71,7 @@ func init() {
 		"container",
 		"c",
 		"",
-		"Assign a different name to the toolbox container.")
+		"Assign a different name to the toolbox container")
 
 	flags.StringVar(&createFlags.hostname,
 		"hostname",
@@ -82,13 +82,13 @@ func init() {
 		"image",
 		"i",
 		"",
-		"Change the name of the base image used to create the toolbox container.")
+		"Change the name of the base image used to create the toolbox container")
 
 	flags.StringVarP(&createFlags.release,
 		"release",
 		"r",
 		"",
-		"Create a toolbox container for a different operating system release than the host.")
+		"Create a toolbox container for a different operating system release than the host")
 
 	flags.StringArrayVar(&createFlags.volumes,
 		"volume",
@@ -114,6 +114,9 @@ func create(cmd *cobra.Command, args []string) error {
 
 	var container string
 	var containerArg string
+	if cmd.Flag("image").Changed && cmd.Flag("release").Changed {
+		return errors.New("options --image and --release cannot be used together")
+	}
 
 	if len(args) != 0 {
 		container = args[0]
@@ -124,7 +127,7 @@ func create(cmd *cobra.Command, args []string) error {
 	}
 
 	if container != "" {
-		if _, err := utils.IsContainerNameValid(container); err != nil {
+		if !utils.IsContainerNameValid(container) {
 			var builder strings.Builder
 			fmt.Fprintf(&builder, "invalid argument for '%s'\n", containerArg)
 			fmt.Fprintf(&builder, "Container names must match '%s'\n", utils.ContainerNameRegexp)
@@ -203,6 +206,24 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 	toolboxPathEnvArg := "TOOLBOX_PATH=" + toolboxPath
 	toolboxPathMountArg := toolboxPath + ":/usr/bin/toolbox:ro"
 
+	var runtimeDirectory string
+	var xdgRuntimeDirEnv []string
+
+	if currentUser.Uid == "0" {
+		runtimeDirectory, err = utils.GetRuntimeDirectory(currentUser)
+		if err != nil {
+			return err
+		}
+	} else {
+		xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
+		xdgRuntimeDirEnvArg := "XDG_RUNTIME_DIR=" + xdgRuntimeDir
+		xdgRuntimeDirEnv = []string{"--env", xdgRuntimeDirEnvArg}
+
+		runtimeDirectory = xdgRuntimeDir
+	}
+
+	runtimeDirectoryMountArg := runtimeDirectory + ":" + runtimeDirectory
+
 	logrus.Debug("Checking if 'podman create' supports '--mount type=devpts'")
 
 	var devPtsMount []string
@@ -219,6 +240,13 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 	if podman.CheckVersion("1.5.0") {
 		logrus.Debug("'podman create' supports '--ulimit host'")
 		ulimitHost = []string{"--ulimit", "host"}
+	}
+
+	var usernsArg string
+	if currentUser.Uid == "0" {
+		usernsArg = "host"
+	} else {
+		usernsArg = "keep-id"
 	}
 
 	dbusSystemSocket, err := getDBusSystemSocket()
@@ -247,12 +275,20 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 
 	usrMountArg := "/usr:/run/host/usr:" + usrMountFlags + ",rslave"
 
-	xdgRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
-	xdgRuntimeDirMountArg := xdgRuntimeDir + ":" + xdgRuntimeDir
+	var avahiSocketMount []string
+
+	avahiSocket, err := getServiceSocket("Avahi", "avahi-daemon.socket")
+	if err != nil {
+		logrus.Debug(err)
+	}
+	if avahiSocket != "" {
+		avahiSocketMountArg := avahiSocket + ":" + avahiSocket
+		avahiSocketMount = []string{"--volume", avahiSocketMountArg}
+	}
 
 	var kcmSocketMount []string
 
-	kcmSocket, err := getKCMSocket()
+	kcmSocket, err := getServiceSocket("KCM", "sssd-kcm.socket")
 	if err != nil {
 		logrus.Debug(err)
 	}
@@ -348,11 +384,16 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 		"create",
 		"--dns", "none",
 		"--env", toolboxPathEnvArg,
+	}
+
+	createArgs = append(createArgs, xdgRuntimeDirEnv...)
+
+	createArgs = append(createArgs, []string{
 		"--hostname", createFlags.hostname,
 		"--ipc", "host",
 		"--label", "com.github.containers.toolbox=true",
 		"--label", "com.github.debarshiray.toolbox=true",
-	}
+	}...)
 
 	createArgs = append(createArgs, devPtsMount...)
 
@@ -368,7 +409,7 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 	createArgs = append(createArgs, ulimitHost...)
 
 	createArgs = append(createArgs, []string{
-		"--userns=keep-id",
+		"--userns", usernsArg,
 		"--user", "root:root",
 		"--volume", "/boot:/run/host/boot:rslave",
 		"--volume", "/etc:/run/host/etc",
@@ -380,9 +421,10 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 		"--volume", homeDirMountArg,
 		"--volume", toolboxPathMountArg,
 		"--volume", usrMountArg,
-		"--volume", xdgRuntimeDirMountArg,
+		"--volume", runtimeDirectoryMountArg,
 	}...)
 
+	createArgs = append(createArgs, avahiSocketMount...)
 	createArgs = append(createArgs, kcmSocketMount...)
 	createArgs = append(createArgs, mediaMount...)
 	createArgs = append(createArgs, mntMount...)
@@ -519,28 +561,30 @@ func getFullyQualifiedImageName(image string) (string, error) {
 	return imageFull, nil
 }
 
-func getKCMSocket() (string, error) {
-	logrus.Debug("Resolving path to the KCM socket")
+func getServiceSocket(serviceName string, unitName string) (string, error) {
+	logrus.Debugf("Resolving path to the %s socket", serviceName)
 
 	connection, err := dbus.SystemBus()
 	if err != nil {
 		return "", errors.New("failed to connect to the D-Bus system instance")
 	}
 
-	kcmUnitNameEscaped := systemdPathBusEscape("sssd-kcm.socket")
-	kcmUnitPath := dbus.ObjectPath("/org/freedesktop/systemd1/unit/" + kcmUnitNameEscaped)
-	kcmUnit := connection.Object("org.freedesktop.systemd1", kcmUnitPath)
-	call := kcmUnit.Call("org.freedesktop.DBus.Properties.GetAll", 0, "")
+	unitNameEscaped := systemdPathBusEscape(unitName)
+	unitPath := dbus.ObjectPath("/org/freedesktop/systemd1/unit/" + unitNameEscaped)
+	unit := connection.Object("org.freedesktop.systemd1", unitPath)
+	call := unit.Call("org.freedesktop.DBus.Properties.GetAll", 0, "")
 
 	var result map[string]dbus.Variant
 	err = call.Store(&result)
 	if err != nil {
-		return "", errors.New("failed to get the properties of sssd-kcm.socket")
+		errMsg := fmt.Sprintf("failed to get the properties of %s", unitName)
+		return "", errors.New(errMsg)
 	}
 
 	listenVariant, listenFound := result["Listen"]
 	if !listenFound {
-		return "", errors.New("failed to find the Listen property of sssd-kcm.socket")
+		errMsg := fmt.Sprintf("failed to find the Listen property of %s", unitName)
+		return "", errors.New(errMsg)
 	}
 
 	listenVariantSignature := listenVariant.Signature().String()
@@ -566,7 +610,8 @@ func getKCMSocket() (string, error) {
 		}
 	}
 
-	return "", errors.New("failed to find a SOCK_STREAM socket for sssd-kcm.socket")
+	errMsg := fmt.Sprintf("failed to find a SOCK_STREAM socket for %s", unitName)
+	return "", errors.New(errMsg)
 }
 
 func isUsrReadWrite() (bool, error) {

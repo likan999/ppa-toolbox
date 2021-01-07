@@ -52,7 +52,7 @@ func init() {
 		"container",
 		"c",
 		"",
-		"Run command inside a toolbox container with the given name.")
+		"Run command inside a toolbox container with the given name")
 
 	flags.BoolVarP(&runFlags.noTty,
 		"no-tty",
@@ -64,7 +64,7 @@ func init() {
 		"release",
 		"r",
 		"",
-		"Run command inside a toolbox container for a different operating system release than the host.")
+		"Run command inside a toolbox container for a different operating system release than the host")
 
 	runCmd.SetHelpFunc(runHelp)
 	rootCmd.AddCommand(runCmd)
@@ -88,7 +88,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if runFlags.container != "" {
 		nonDefaultContainer = true
 
-		if _, err := utils.IsContainerNameValid(runFlags.container); err != nil {
+		if !utils.IsContainerNameValid(runFlags.container) {
 			var builder strings.Builder
 			fmt.Fprintf(&builder, "invalid argument for '--container'\n")
 			fmt.Fprintf(&builder, "Container names must match '%s'\n", utils.ContainerNameRegexp)
@@ -245,8 +245,11 @@ func runCommand(container string,
 
 	logrus.Debugf("Waiting for container %s to finish initializing", container)
 
-	runtimeDirectory := os.Getenv("XDG_RUNTIME_DIR")
-	toolboxRuntimeDirectory := runtimeDirectory + "/toolbox"
+	toolboxRuntimeDirectory, err := utils.GetRuntimeDirectory(currentUser)
+	if err != nil {
+		return err
+	}
+
 	initializedStamp := fmt.Sprintf("%s/container-initialized-%d", toolboxRuntimeDirectory, entryPointPID)
 
 	logrus.Debugf("Checking if initialization stamp %s exists", initializedStamp)
@@ -315,7 +318,7 @@ func runCommand(container string,
 	execArgs = append(execArgs, command...)
 
 	if emitEscapeSequence {
-		fmt.Printf("\033]777;container;push;%s;toolbox\033\\", container)
+		fmt.Printf("\033]777;container;push;%s;toolbox;%s\033\\", container, currentUser.Uid)
 	}
 
 	logrus.Debugf("Running in container %s:", container)
@@ -327,7 +330,7 @@ func runCommand(container string,
 	exitCode, err := shell.RunWithExitCode("podman", os.Stdin, os.Stdout, nil, execArgs...)
 
 	if emitEscapeSequence {
-		fmt.Print("\033]777;container;pop;;\033\\")
+		fmt.Printf("\033]777;container;pop;;;%s\033\\", currentUser.Uid)
 	}
 
 	switch exitCode {

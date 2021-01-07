@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,6 +58,7 @@ var (
 		{"/tmp", "/run/host/tmp", "rslave"},
 		{"/var/lib/flatpak", "/run/host/var/lib/flatpak", "ro"},
 		{"/var/lib/libvirt", "/run/host/var/lib/libvirt", ""},
+		{"/var/lib/systemd/coredump", "/run/host/var/lib/systemd/coredump", "ro"},
 		{"/var/log/journal", "/run/host/var/log/journal", "ro"},
 		{"/var/mnt", "/run/host/var/mnt", "rslave"},
 	}
@@ -75,42 +77,42 @@ func init() {
 	flags.StringVar(&initContainerFlags.home,
 		"home",
 		"",
-		"Create a user inside the toolbox container whose login directory is HOME.")
+		"Create a user inside the toolbox container whose login directory is HOME")
 	initContainerCmd.MarkFlagRequired("home")
 
 	flags.BoolVar(&initContainerFlags.homeLink,
 		"home-link",
 		false,
-		"Make /home a symbolic link to /var/home.")
+		"Make /home a symbolic link to /var/home")
 
 	flags.BoolVar(&initContainerFlags.mediaLink,
 		"media-link",
 		false,
-		"Make /media a symbolic link to /run/media.")
+		"Make /media a symbolic link to /run/media")
 
-	flags.BoolVar(&initContainerFlags.mntLink, "mnt-link", false, "Make /mnt a symbolic link to /var/mnt.")
+	flags.BoolVar(&initContainerFlags.mntLink, "mnt-link", false, "Make /mnt a symbolic link to /var/mnt")
 
 	flags.BoolVar(&initContainerFlags.monitorHost,
 		"monitor-host",
 		false,
-		"Ensure that certain configuration files inside the toolbox container are in sync with the host.")
+		"Ensure that certain configuration files inside the toolbox container are in sync with the host")
 
 	flags.StringVar(&initContainerFlags.shell,
 		"shell",
 		"",
-		"Create a user inside the toolbox container whose login shell is SHELL.")
+		"Create a user inside the toolbox container whose login shell is SHELL")
 	initContainerCmd.MarkFlagRequired("shell")
 
 	flags.IntVar(&initContainerFlags.uid,
 		"uid",
 		0,
-		"Create a user inside the toolbox container whose numerical user ID is UID.")
+		"Create a user inside the toolbox container whose numerical user ID is UID")
 	initContainerCmd.MarkFlagRequired("uid")
 
 	flags.StringVar(&initContainerFlags.user,
 		"user",
 		"",
-		"Create a user inside the toolbox container whose login name is USER.")
+		"Create a user inside the toolbox container whose login name is USER")
 	initContainerCmd.MarkFlagRequired("user")
 
 	initContainerCmd.SetHelpFunc(initContainerHelp)
@@ -127,15 +129,7 @@ func initContainer(cmd *cobra.Command, args []string) error {
 		return errors.New(errMsg)
 	}
 
-	runtimeDirectory := os.Getenv("XDG_RUNTIME_DIR")
-	if runtimeDirectory == "" {
-		logrus.Debug("XDG_RUNTIME_DIR is unset")
-
-		runtimeDirectory = fmt.Sprintf("/run/user/%d", initContainerFlags.uid)
-		os.Setenv("XDG_RUNTIME_DIR", runtimeDirectory)
-
-		logrus.Debugf("XDG_RUNTIME_DIR set to %s", runtimeDirectory)
-	}
+	utils.EnsureXdgRuntimeDirIsSet(initContainerFlags.uid)
 
 	logrus.Debug("Creating /run/.toolboxenv")
 
@@ -285,16 +279,15 @@ func initContainer(cmd *cobra.Command, args []string) error {
 
 	logrus.Debug("Finished initializing container")
 
-	toolboxRuntimeDirectory := runtimeDirectory + "/toolbox"
-	logrus.Debugf("Creating runtime directory %s", toolboxRuntimeDirectory)
-
-	if err := os.MkdirAll(toolboxRuntimeDirectory, 0700); err != nil {
-		return fmt.Errorf("failed to create runtime directory %s", toolboxRuntimeDirectory)
+	uidString := strconv.Itoa(initContainerFlags.uid)
+	targetUser, err := user.LookupId(uidString)
+	if err != nil {
+		return fmt.Errorf("failed to lookup user ID %s: %w", uidString, err)
 	}
 
-	if err := os.Chown(toolboxRuntimeDirectory, initContainerFlags.uid, initContainerFlags.uid); err != nil {
-		return fmt.Errorf("failed to change ownership of the runtime directory %s",
-			toolboxRuntimeDirectory)
+	toolboxRuntimeDirectory, err := utils.GetRuntimeDirectory(targetUser)
+	if err != nil {
+		return err
 	}
 
 	pid := os.Getpid()
@@ -614,6 +607,14 @@ func extractTimeZoneFromLocalTimeSymLink(path string) (string, error) {
 func updateTimeZoneFromLocalTime() error {
 	localTimeEvaled, err := filepath.EvalSymlinks("/etc/localtime")
 	if err != nil {
+		if os.IsNotExist(err) {
+			if err := writeTimeZone("UTC"); err != nil {
+				return err
+			}
+
+			return nil
+		}
+
 		return fmt.Errorf("failed to resolve /etc/localtime: %w", err)
 	}
 
@@ -624,6 +625,14 @@ func updateTimeZoneFromLocalTime() error {
 		return err
 	}
 
+	if err := writeTimeZone(timeZone); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func writeTimeZone(timeZone string) error {
 	const etcTimeZone = "/etc/timezone"
 
 	if err := os.Remove(etcTimeZone); err != nil {
@@ -633,8 +642,7 @@ func updateTimeZoneFromLocalTime() error {
 	}
 
 	timeZoneBytes := []byte(timeZone + "\n")
-	err = ioutil.WriteFile(etcTimeZone, timeZoneBytes, 0664)
-	if err != nil {
+	if err := ioutil.WriteFile(etcTimeZone, timeZoneBytes, 0664); err != nil {
 		return fmt.Errorf("failed to create new %s: %w", etcTimeZone, err)
 	}
 

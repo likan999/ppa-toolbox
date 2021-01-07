@@ -46,13 +46,13 @@ func init() {
 		"container",
 		"c",
 		"",
-		"Enter a toolbox container with the given name.")
+		"Enter a toolbox container with the given name")
 
 	flags.StringVarP(&enterFlags.release,
 		"release",
 		"r",
 		"",
-		"Enter a toolbox container for a different operating system release than the host.")
+		"Enter a toolbox container for a different operating system release than the host")
 
 	enterCmd.SetHelpFunc(enterHelp)
 	rootCmd.AddCommand(enterCmd)
@@ -86,7 +86,7 @@ func enter(cmd *cobra.Command, args []string) error {
 	if container != "" {
 		nonDefaultContainer = true
 
-		if _, err := utils.IsContainerNameValid(container); err != nil {
+		if !utils.IsContainerNameValid(container) {
 			var builder strings.Builder
 			fmt.Fprintf(&builder, "invalid argument for '%s'\n", containerArg)
 			fmt.Fprintf(&builder, "Container names must match '%s'\n", utils.ContainerNameRegexp)
