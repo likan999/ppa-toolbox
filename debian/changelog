@@ -1,3 +1,17 @@
+stable (0.0.99) stable; urgency=medium
+
+  * Add a --distro option to 'create', 'enter' and 'run'
+  * Prevent setting VTE-specific PROMPT_COMMAND without VTE
+  * Remove the --candidate-registry option from Bash completion and the manual
+    for 'create'
+  * Remove the deprecated reset command
+  * Support RHEL hosts by creating containers based on UBI
+  * Try to avoid 'latest' tags, when looking at RepoTags
+  * Update the labels used for filtering toolbox containers images
+  * Update the range of supported Fedora releases
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Tue, 12 Jan 2021 13:56:59 +0100
+
 stable (0.0.98.1) stable; urgency=medium
 
   * Pass the USER environment variable to the container
