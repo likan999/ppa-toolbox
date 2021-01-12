@@ -1,3 +1,12 @@
+stable (0.0.98.1) stable; urgency=medium
+
+  * Pass the USER environment variable to the container
+  * Make /etc/profile.d/toolbox.sh compatible with Z shell again
+  * Update the manual to mention that the --image and --release options of
+    'create' can't be used together
+
+ -- Debarshi Ray <rishi@fedoraproject.org>  Thu, 7 Jan 2021 20:17:06 +0100
+
 stable (0.0.98) stable; urgency=medium
 
   * Add nss-mdns to the fedora-toolbox images
