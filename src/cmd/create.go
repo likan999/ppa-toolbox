@@ -43,6 +43,7 @@ const (
 var (
 	createFlags struct {
 		container string
+		distro    string
 		hostname  string
 		image     string
 		release   string
@@ -72,6 +73,12 @@ func init() {
 		"c",
 		"",
 		"Assign a different name to the toolbox container")
+
+	flags.StringVarP(&createFlags.distro,
+		"distro",
+		"d",
+		"",
+		"Create a toolbox container for a different operating system distribution than the host")
 
 	flags.StringVar(&createFlags.hostname,
 		"hostname",
@@ -112,11 +119,16 @@ func create(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	var container string
-	var containerArg string
+	if cmd.Flag("distro").Changed && cmd.Flag("image").Changed {
+		return errors.New("options --distro and --image cannot be used together")
+	}
+
 	if cmd.Flag("image").Changed && cmd.Flag("release").Changed {
 		return errors.New("options --image and --release cannot be used together")
 	}
+
+	var container string
+	var containerArg string
 
 	if len(args) != 0 {
 		container = args[0]
@@ -141,7 +153,7 @@ func create(cmd *cobra.Command, args []string) error {
 	var release string
 	if createFlags.release != "" {
 		var err error
-		release, err = utils.ParseRelease(createFlags.release)
+		release, err = utils.ParseRelease(createFlags.distro, createFlags.release)
 		if err != nil {
 			err := utils.CreateErrorInvalidRelease(executableBase)
 			return err
@@ -149,6 +161,7 @@ func create(cmd *cobra.Command, args []string) error {
 	}
 
 	container, image, release, err := utils.ResolveContainerAndImageNames(container,
+		createFlags.distro,
 		createFlags.image,
 		release)
 	if err != nil {
@@ -197,7 +210,7 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 		return nil
 	}
 
-	imageFull, err := getFullyQualifiedImageName(image)
+	imageFull, err := getFullyQualifiedImageFromRepoTags(image)
 	if err != nil {
 		return err
 	}
@@ -531,8 +544,8 @@ func getEnterCommand(container, release string) string {
 	return enterCommand
 }
 
-func getFullyQualifiedImageName(image string) (string, error) {
-	logrus.Debugf("Resolving fully qualified name for image %s", image)
+func getFullyQualifiedImageFromRepoTags(image string) (string, error) {
+	logrus.Debugf("Resolving fully qualified name for image %s from RepoTags", image)
 
 	var imageFull string
 
@@ -553,7 +566,18 @@ func getFullyQualifiedImageName(image string) (string, error) {
 			return "", fmt.Errorf("empty RepoTag for image %s", image)
 		}
 
-		imageFull = repoTags[0].(string)
+		for _, repoTag := range repoTags {
+			repoTagString := repoTag.(string)
+			tag := utils.ImageReferenceGetTag(repoTagString)
+			if tag != "latest" {
+				imageFull = repoTagString
+				break
+			}
+		}
+
+		if imageFull == "" {
+			imageFull = repoTags[0].(string)
+		}
 	}
 
 	logrus.Debugf("Resolved image %s to %s", image, imageFull)
@@ -663,7 +687,11 @@ func pullImage(image, release string) (bool, error) {
 	if hasDomain {
 		imageFull = image
 	} else {
-		imageFull = fmt.Sprintf("registry.fedoraproject.org/f%s/%s", release, image)
+		var err error
+		imageFull, err = utils.GetFullyQualifiedImageFromDistros(image, release)
+		if err != nil {
+			return false, fmt.Errorf("image %s not found in local storage and known registries", image)
+		}
 	}
 
 	logrus.Debugf("Looking for image %s", imageFull)

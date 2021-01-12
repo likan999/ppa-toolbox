@@ -33,8 +33,9 @@ import (
 var (
 	runFlags struct {
 		container string
-		release   string
+		distro    string
 		noTty     bool
+		release   string
 	}
 )
 
@@ -53,6 +54,12 @@ func init() {
 		"c",
 		"",
 		"Run command inside a toolbox container with the given name")
+
+	flags.StringVarP(&runFlags.distro,
+		"distro",
+		"d",
+		"",
+		"Run command inside a toolbox container for a different operating system distribution than the host")
 
 	flags.BoolVarP(&runFlags.noTty,
 		"no-tty",
@@ -104,7 +111,7 @@ func run(cmd *cobra.Command, args []string) error {
 		nonDefaultContainer = true
 
 		var err error
-		release, err = utils.ParseRelease(runFlags.release)
+		release, err = utils.ParseRelease(runFlags.distro, runFlags.release)
 		if err != nil {
 			err := utils.CreateErrorInvalidRelease(executableBase)
 			return err
@@ -122,7 +129,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	command := args
 
-	container, image, release, err := utils.ResolveContainerAndImageNames(runFlags.container, "", release)
+	container, image, release, err := utils.ResolveContainerAndImageNames(runFlags.container, runFlags.distro, "", release)
 	if err != nil {
 		return err
 	}
