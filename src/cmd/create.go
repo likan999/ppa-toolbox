@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019 – 2020 Red Hat Inc.
+ * Copyright © 2019 – 2021 Red Hat Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -325,17 +325,19 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 		}
 	}
 
-	logrus.Debug("Checking if /mnt is a symbolic link to /var/mnt")
-
 	var mntLink []string
 	var mntMount []string
 
-	mntPath, _ := filepath.EvalSymlinks("/mnt")
-	if mntPath == "/var/mnt" {
-		logrus.Debug("/mnt is a symbolic link to /var/mnt")
-		mntLink = []string{"--mnt-link"}
-	} else {
-		mntMount = []string{"--volume", "/mnt:/mnt:rslave"}
+	if utils.PathExists("/mnt") {
+		logrus.Debug("Checking if /mnt is a symbolic link to /var/mnt")
+
+		mntPath, _ := filepath.EvalSymlinks("/mnt")
+		if mntPath == "/var/mnt" {
+			logrus.Debug("/mnt is a symbolic link to /var/mnt")
+			mntLink = []string{"--mnt-link"}
+		} else {
+			mntMount = []string{"--volume", "/mnt:/mnt:rslave"}
+		}
 	}
 
 	var runMediaMount []string

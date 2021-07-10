@@ -10,17 +10,6 @@
     run: playbooks/shellcheck.yaml
 
 - job:
-    name: system-test-fedora-31
-    description: Run Toolbox's system tests in Fedora 31
-    timeout: 1200
-    nodeset:
-      nodes:
-        - name: ci-node-31
-          label: cloud-fedora-31-small
-    pre-run: playbooks/fedora-31/setup-env.yaml
-    run: playbooks/fedora-31/system-test-fedora-31.yaml
-
-- job:
     name: system-test-fedora-32
     description: Run Toolbox's system tests in Fedora 32
     timeout: 1200
@@ -28,8 +17,8 @@
       nodes:
         - name: ci-node-32
           label: cloud-fedora-32-small
-    pre-run: playbooks/fedora-32/setup-env.yaml
-    run: playbooks/fedora-32/system-test-fedora-32.yaml
+    pre-run: playbooks/setup-env.yaml
+    run: playbooks/system-test.yaml
 
 - job:
     name: system-test-fedora-33
@@ -39,8 +28,19 @@
       nodes:
         - name: ci-node-33
           label: cloud-fedora-33-small
-    pre-run: playbooks/fedora-33/setup-env.yaml
-    run: playbooks/fedora-33/system-test-fedora-33.yaml
+    pre-run: playbooks/setup-env.yaml
+    run: playbooks/system-test.yaml
+
+- job:
+    name: system-test-fedora-34
+    description: Run Toolbox's system tests in Fedora 34
+    timeout: 1200
+    nodeset:
+      nodes:
+        - name: ci-node-34
+          label: cloud-fedora-34-small
+    pre-run: playbooks/setup-env.yaml
+    run: playbooks/system-test.yaml
 
 - job:
     name: system-test-fedora-rawhide
@@ -50,26 +50,26 @@
       nodes:
         - name: ci-node-rawhide
           label: cloud-fedora-rawhide-small
-    pre-run: playbooks/fedora-rawhide/setup-env.yaml
-    run: playbooks/fedora-rawhide/system-test-fedora-rawhide.yaml
+    pre-run: playbooks/setup-env.yaml
+    run: playbooks/system-test.yaml
 
 - project:
     periodic:
       jobs:
-        - system-test-fedora-31
         - system-test-fedora-32
         - system-test-fedora-33
+        - system-test-fedora-34
         - system-test-fedora-rawhide
     check:
       jobs:
         - shellcheck
-        - system-test-fedora-31
         - system-test-fedora-32
         - system-test-fedora-33
+        - system-test-fedora-34
         - system-test-fedora-rawhide
     gate:
       jobs:
-        - system-test-fedora-31
         - system-test-fedora-32
         - system-test-fedora-33
+        - system-test-fedora-34
         - system-test-fedora-rawhide

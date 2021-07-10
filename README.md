@@ -1,7 +1,7 @@
 <img src="data/logo/toolbox-logo-landscape.svg" alt="Toolbox logo landscape" width="800"/>
 
 [![Zuul](https://zuul-ci.org/gated.svg)](https://softwarefactory-project.io/zuul/t/local/builds?project=containers/toolbox)
-[![Daily Pipeline](https://img.shields.io/badge/zuul-periodic-informational)](https://softwarefactory-project.io/zuul/t/local/builds?project=containers%2Ftoolbox&pipeline=periodic)
+[![Daily Pipeline](https://softwarefactory-project.io/zuul/api/tenant/local/badge?project=containers/toolbox&pipeline=periodic)](https://softwarefactory-project.io/zuul/t/local/builds?project=containers%2Ftoolbox&pipeline=periodic)
 
 [![Arch Linux package](https://img.shields.io/archlinux/v/community/x86_64/toolbox)](https://www.archlinux.org/packages/community/x86_64/toolbox/)
 [![Fedora package](https://img.shields.io/fedora/v/toolbox/rawhide)](https://src.fedoraproject.org/rpms/toolbox/)
@@ -11,25 +11,34 @@ systems, which allows the use of containerized command line environments. It is
 built on top of [Podman](https://podman.io/) and other standard container
 technologies from [OCI](https://opencontainers.org/).
 
-The toolbox container is a fully *mutable* container; when you see
-`yum install ansible` for example, that's something you can do inside your
-toolbox container, without affecting the base operating system.
-
 This is particularly useful on
 [OSTree](https://ostree.readthedocs.io/en/latest/) based operating systems like
 [Fedora CoreOS](https://coreos.fedoraproject.org/) and
-[Silverblue](https://silverblue.fedoraproject.org/).  The intention of these
+[Silverblue](https://silverblue.fedoraproject.org/). The intention of these
 systems is to discourage installation of software on the host, and instead
-install software as (or in) containers.
+install software as (or in) containers — they mostly don't even have package
+managers like DNF or YUM. This makes it difficult to set up a development
+environment or install tools for debugging in the usual way.
 
-However, this tool doesn't *require* using an OSTree based system — it
-works equally well if you're running e.g. existing Fedora Workstation or
-Server, and that's a useful way to incrementally adopt containerization.
+Toolbox solves this problem by providing a fully mutable container within
+which one can install their favourite development and debugging tools, editors
+and SDKs. For example, it's possible to do `yum install ansible` without
+affecting the base operating system.
+
+However, this tool doesn't *require* using an OSTree based system. It works
+equally well on Fedora Workstation and Server, and that's a useful way to
+incrementally adopt containerization.
 
 The toolbox environment is based on an [OCI](https://www.opencontainers.org/)
 image. On Fedora this is the `fedora-toolbox` image. This image is used to
 create a toolbox container that seamlessly integrates with the rest of the
-operating system.
+operating system by providing access to the user's home directory, the Wayland
+and X11 sockets, SSH agent, etc..
+
+## Installation
+
+Toolbox is installed by default on Fedora Silverblue. On other operating
+systems it's just a matter of installing the `toolbox` package.
 
 ## Usage
 
@@ -54,7 +63,7 @@ This will create a container called `fedora-toolbox-<version-id>`.
 [user@hostname ~]$
 ```
 
-## Dependencies and Installation
+## Dependencies and Building
 
 Toolbox requires at least Podman 1.4.0 to work, and uses the Meson build
 system.
@@ -63,6 +72,8 @@ The following dependencies are required to build it:
 - meson
 - go-md2man
 - systemd
+- go
+- ninja
 
 The following dependencies enable various optional features:
 - bash-completion
@@ -82,65 +93,6 @@ By default, Toolbox uses Go modules and all the required Go packages are
 automatically downloaded as part of the build. There's no need to worry about
 the Go dependencies, unless the build environment doesn't have network access
 or any such peculiarities.
-
-## Goals and Use Cases
-
-### High Level Goals
-
-- Provide a CLI convenience interface to run containers (via `podman`) easily
-- Support for Developer and Debugging/Management use cases
-- Support for multiple distros
-    - toolbox package in multiple distros
-    - toolbox containers for multiple distros
-
-### Non-Goals - Anti Use Cases
-
-- Supporting multiple container runtimes. `toolbox` will use `podman` exclusively
-- Adding significant features on top of `podman`
-	- Significant feature requests should be driven into `podman` upstream
-- To run containers that aren't tightly integrated with the host
-	- i.e. extremely sandboxed containers become specific to the user quickly
-
-### Developer Use Cases
-
-- I’m a developer hacking on source code and building/testing code
-    - Most cases: user doesn't need root, rootless containers work fine
-    - Some cases: user needs root for testing
-- Desktop Development: 
-    - developers need things like dbus, display, etc, to be forwarded into the toolbox
-- Headless Development:
-    - toolbox works properly in headless environments (no display, etc)
-- Need development tools like gdb, strace, etc to work
-
-### Debugging/System management Use Cases
-
-- Inspecting Host Processes/Kernel
-    - Typically need root access
-    - Need bpftrace, strace on host processes to work
-		- Ideally even do things like helping get kernel-debuginfo data for the host kernel
-- Managing system services
-    - systemctl restart foo.service
-    - journalctl
-- Managing updates to the host
-    - rpm-ostree
-    - dnf/yum (classic systems)
-
-### Specific environments
-
-- Fedora Silverblue
-	- Silverblue comes with a subset of packages and discourages host software changes
-		- Users need a toolbox container as a working environment
-		- Future: use toolbox container by default when a user opens a shell
-- Fedora CoreOS
-	- Similar to silverblue, but non-graphical and smaller package set
-- RHEL CoreOS
-	- Similar to Fedora CoreOS. Based on RHEL content and the underlying OS for OpenShift
-	- Need to [use default authfile on pull](https://github.com/coreos/toolbox/pull/58/commits/413f83f7240d3c31121b557bfd55e489fad24489)
-    - Need to ensure compatibility with the rhel7/support-tools container 
-		- currently not a toolbox image, opportunity for collaboration
-	- Alignment with `oc debug node/` (OpenShift)
-		- `oc debug node` opens a shell on a kubernetes node
-		- Value in having a consistent environment for both `toolbox` in debugging mode and `oc debug node`
 
 ## Distro support
 

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019 – 2020 Red Hat Inc.
+ * Copyright © 2019 – 2021 Red Hat Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,8 +98,8 @@ var (
 			"fedora-toolbox",
 			parseReleaseFedora,
 			"registry.fedoraproject.org",
-			"f%s",
-			true,
+			"",
+			false,
 		},
 		"rhel": {
 			"rhel-toolbox",
@@ -345,7 +345,13 @@ func GetFullyQualifiedImageFromDistros(image, release string) (string, error) {
 			repository = distroObj.Repository
 		}
 
-		imageFull := distroObj.Registry + "/" + repository + "/" + image
+		imageFull := distroObj.Registry
+
+		if repository != "" {
+			imageFull = imageFull + "/" + repository
+		}
+
+		imageFull = imageFull + "/" + image
 
 		logrus.Debugf("Resolved image %s to %s", image, imageFull)
 

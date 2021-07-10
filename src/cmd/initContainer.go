@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019 – 2020 Red Hat Inc.
+ * Copyright © 2019 – 2021 Red Hat Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -591,16 +591,20 @@ func extractTimeZoneFromLocalTimeSymLink(path string) (string, error) {
 		"/run/host/usr/share/zoneinfo",
 		"/usr/share/zoneinfo",
 	}
+
 	for _, root := range zoneInfoRoots {
 		if !strings.HasPrefix(path, root) {
 			continue
 		}
+
 		timeZone, err := filepath.Rel(root, path)
 		if err != nil {
 			return "", fmt.Errorf("failed to extract time zone: %w", err)
 		}
+
 		return timeZone, nil
 	}
+
 	return "", errors.New("/etc/localtime points to unknown location")
 }
 

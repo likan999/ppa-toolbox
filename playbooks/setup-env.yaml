@@ -1,0 +1,75 @@
+---
+- hosts: all
+  tasks:
+    - name: Install requirements
+      become: yes
+      package:
+        use: dnf
+        name:
+          - bash-completion
+          - bats
+          - flatpak-session-helper
+          - golang
+          - golang-github-cpuguy83-md2man
+          - meson
+          - ninja-build
+          - podman
+          - skopeo
+          - systemd
+          - udisks2
+
+    - name: Install bats-assert library
+      git:
+        repo: https://github.com/bats-core/bats-assert
+        dest: '{{ zuul.project.src_dir }}/test/system/libs/bats-assert'
+        depth: 1
+        version: v2.0.0
+
+    - name: Install bats-support library
+      git:
+        repo: https://github.com/bats-core/bats-support
+        dest: '{{ zuul.project.src_dir }}/test/system/libs/bats-support'
+        depth: 1
+        version: v0.3.0
+
+    - name: Setup environment
+      become: yes
+      command:
+        cmd: systemd-tmpfiles --create
+        creates: /run/media
+
+    - name: Check versions of crucial packages
+      command: rpm -q golang podman crun conmon fuse-overlayfs flatpak-session-helper
+
+    - name: Show podman versions
+      command: podman version
+
+    - name: Show podman debug information
+      command: podman info --debug
+
+    - name: Pull the default image from registry.fedoraproject.org
+      command: "podman pull registry.fedoraproject.org/fedora-toolbox:{{ ansible_distribution_version }}"
+      register: _podman
+      until: _podman.rc == 0
+      retries: 5
+      delay: 10
+
+    - name: Copy the default image to a directory
+      command:
+        cmd: "skopeo copy containers-storage:registry.fedoraproject.org/fedora-toolbox:{{ ansible_distribution_version }} dir:{{ zuul.project.src_dir }}/fedora-toolbox-{{ ansible_distribution_version }}"
+        creates: "{{ zuul.project.src_dir }}/fedora-toolbox-{{ ansible_distribution_version }}/manifest.json"
+
+    - name: Pull registry.fedoraproject.org/f29/fedora-toolbox:29
+      command: podman pull registry.fedoraproject.org/f29/fedora-toolbox:29
+      register: _podman
+      until: _podman.rc == 0
+      retries: 5
+      delay: 10
+
+    - name: Copy registry.fedoraproject.org/f29/fedora-toolbox:29 to a directory
+      command:
+        cmd: "skopeo copy containers-storage:registry.fedoraproject.org/f29/fedora-toolbox:29 dir:{{ zuul.project.src_dir }}/fedora-toolbox-29"
+        creates: "{{ zuul.project.src_dir }}/fedora-toolbox-29/manifest.json"
+
+    - name: Clean up the local containers storage
+      command: podman system reset --force
