@@ -1,10 +1,15 @@
 % toolbox(1)
 
 ## NAME
-toolbox - Unprivileged development environment
+toolbox - Tool for containerized command line environments on Linux
 
 ## SYNOPSIS
-**toolbox** [*--verbose* | *-v*] *COMMAND* [*ARGS*]
+**toolbox** [*--assumeyes* | *-y*]
+        [*--help* | *-h*]
+        [*--log-level LEVEL*]
+        [*--log-podman*]
+        [*--verbose* | *-v*]
+        *COMMAND* [*ARGS*...]
 
 ## DESCRIPTION
 
@@ -31,10 +36,11 @@ incrementally adopt containerization.
 The toolbox environment is based on an OCI image. On Fedora this is the
 `fedora-toolbox` image. This image is used to create a toolbox container that
 seamlessly integrates with the rest of the operating system by providing
-access to the user's home directory, the Wayland and X11 sockets, SSH agent,
-etc..
+access to the user's home directory, the Wayland and X11 sockets, networking
+(including Avahi), removable devices (like USB sticks), systemd journal, SSH
+agent, D-Bus, ulimits, /dev and the udev database, etc..
 
-## OPTIONS ##
+## GLOBAL OPTIONS ##
 
 The following options are understood:
 
@@ -46,10 +52,19 @@ Automatically answer yes for all questions.
 
 Print a synopsis of this manual and exit.
 
+**--log-level**=*level*
+
+Log messages above specified level: debug, info, warn, error, fatal or panic
+(default: error)
+
+**--log-podman**
+
+Show log messages of invocations of Podman based on the logging level specified
+by option **log-level**.
+
 **--verbose, -v**
 
-Print debug information including standard error stream of internal commands.
-Use `-vv` for more detail.
+Same as `--log-level=debug`. Use `-vv` to include `--log-podman`.
 
 ## COMMANDS
 
@@ -89,4 +104,4 @@ Run a command in an existing toolbox container.
 
 ## SEE ALSO
 
-`buildah(1)`, `podman(1)`
+`podman(1)`, https://github.com/containers/toolbox

@@ -4,7 +4,8 @@
 toolbox\-init\-container - Initialize a running container
 
 ## SYNOPSIS
-**toolbox init-container** *--home HOME*
+**toolbox init-container** *--gid GID*
+                       *--home HOME*
                        *--home-link*
                        *--media-link*
                        *--mnt-link*
@@ -31,8 +32,10 @@ created by older versions of Toolbox. This is avoided by using the entry point
 to configure the container at runtime.
 
 The entry point of a toolbox container customizes the container to fit the
-current user by ensuring that it has a user that matches the one on the host.
-It ensures that configuration files, such as `/etc/host.conf`, `/etc/hosts`,
+current user by ensuring that it has a user that matches the one on the host,
+and grants it `sudo` and `root` access.
+
+Crucial configuration files, such as `/etc/host.conf`, `/etc/hosts`,
 `/etc/localtime`, `/etc/resolv.conf` and `/etc/timezone`, inside the container
 are kept synchronized with the host. The entry point also bind mounts various
 subsets of the host's filesystem hierarchy to their corresponding locations
@@ -49,9 +52,15 @@ confusion.
 
 The following options are understood:
 
+**--gid** GID
+
+Pass GID as the user's numerical group ID from the host to the toolbox
+container.
+
 **--home** HOME
 
-Create a user inside the toolbox container whose login directory is HOME.
+Create a user inside the toolbox container whose login directory is HOME. This
+option is required.
 
 **--home-link**
 
@@ -67,22 +76,47 @@ Make `/mnt` a symbolic link to `/var/mnt`.
 
 **--monitor-host**
 
-Ensure that certain configuration files inside the toolbox container are kept
-synchronized with their counterparts on the host. Currently, these files are
-`/etc/hosts` and `/etc/resolv.conf`.
+Ensures that certain configuration files inside the toolbox container are kept
+synchronized with their counterparts on the host, and bind mounts some paths
+from the host's file system into the container.
+
+The synchronized files are:
+
+- `/etc/host.conf`
+- `/etc/hosts`
+- `/etc/localtime`
+- `/etc/resolv.conf`
+- `/etc/timezone`
+
+The bind mounted paths are:
+
+- `/etc/machine-id`
+- `/run/libvirt`
+- `/run/systemd/journal`
+- `/run/systemd/resolve`
+- `/run/udev/data`
+- `/tmp`
+- `/var/lib/flatpak`
+- `/var/lib/libvirt`
+- `/var/lib/systemd/coredump`
+- `/var/log/journal`
+- `/var/mnt`
 
 **--shell** SHELL
 
-Create a user inside the toolbox container whose login shell is SHELL.
+Create a user inside the toolbox container whose login shell is SHELL. This
+option is required.
 
 **--uid** UID
 
-Create a user inside the toolbox container whose numerical user ID is UID.
+Create a user inside the toolbox container whose numerical user ID is UID. This
+option is required.
 
 **--user** USER
 
-Create a user inside the toolbox container whose login name is LOGIN.
+Create a user inside the toolbox container whose login name is LOGIN. This
+option is required.
 
 ## SEE ALSO
 
-`podman(1)`, `podman-create(1)`, `podman-start(1)`
+`toolbox(1)`, `podman(1)`, `podman-create(1)`, `podman-start(1)`

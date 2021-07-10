@@ -61,4 +61,5 @@ $ toolbox enter foo
 
 ## SEE ALSO
 
-`buildah(1)`, `podman(1)`, `podman-exec(1)`, `podman-start(1)`
+`toolbox(1)`, `toolbox-run(1)`, `podman(1)`, `podman-exec(1)`,
+`podman-start(1)`

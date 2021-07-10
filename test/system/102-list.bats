@@ -14,34 +14,34 @@ teardown() {
 
 
 @test "list: Run 'list' with zero containers and zero images (the list should be empty)" {
-  run toolbox list
+  run $TOOLBOX list
 
   assert_success
   assert_output ""
 }
 
 @test "list: Run 'list -c' with zero containers (the list should be empty)" {
-  run toolbox list -c
+  run $TOOLBOX list -c
 
   assert_success
   assert_output ""
 }
 
 @test "list: Run 'list -i' with zero images (the list should be empty)" {
-  run toolbox list -c
+  run $TOOLBOX list -c
 
   assert_success
   assert_output ""
 }
 
 @test "list: Run 'list' with zero toolbox's containers and images, but other image (the list should be empty)" {
-  get_busybox_image
+  pull_distro_image busybox
 
   run podman images
 
   assert_output --partial "$BUSYBOX_IMAGE"
 
-  run toolbox list
+  run $TOOLBOX list
 
   assert_success
   assert_output ""
@@ -50,34 +50,54 @@ teardown() {
 @test "list: Try to list images and containers (no flag) with 3 containers and 2 images (the list should have 3 images and 2 containers)" {
   # Pull the two images
   pull_default_image
-  pull_image_old 29
-  # Create tree containers
+  pull_distro_image fedora 32
+
+  # Create three containers
   create_default_container
   create_container non-default-one
   create_container non-default-two
 
   # Check images
-  run toolbox list --images
+  run $TOOLBOX list --images
 
   assert_success
-  assert_output --partial "fedora-toolbox:${DEFAULT_FEDORA_VERSION}"
-  assert_output --partial "fedora-toolbox:29"
+  assert_output --partial "$(get_system_id)-toolbox:$(get_system_version)"
+  assert_output --partial "fedora-toolbox:32"
 
   # Check containers
-  run toolbox list --containers
+  run $TOOLBOX list --containers
 
   assert_success
-  assert_output --partial "fedora-toolbox-${DEFAULT_FEDORA_VERSION}"
+  assert_output --partial "$(get_system_id)-toolbox-$(get_system_version)"
   assert_output --partial "non-default-one"
   assert_output --partial "non-default-two"
 
   # Check all together
-  run toolbox list
+  run $TOOLBOX list
 
   assert_success
-  assert_output --partial "fedora-toolbox:${DEFAULT_FEDORA_VERSION}"
-  assert_output --partial "fedora-toolbox:29"
-  assert_output --partial "fedora-toolbox-${DEFAULT_FEDORA_VERSION}"
+  assert_output --partial "$(get_system_id)-toolbox:$(get_system_version)"
+  assert_output --partial "fedora-toolbox:32"
+  assert_output --partial "$(get_system_id)-toolbox-$(get_system_version)"
   assert_output --partial "non-default-one"
   assert_output --partial "non-default-two"
+}
+
+@test "list: List an image without a name" {
+    echo -e "FROM scratch\n\nLABEL com.github.containers.toolbox=\"true\"" > "$BATS_TMPDIR"/Containerfile
+
+    run $PODMAN build "$BATS_TMPDIR"
+
+    assert_success
+    assert_line --index 0 "STEP 1: FROM scratch"
+    assert_line --index 1 "STEP 2: LABEL com.github.containers.toolbox=\"true\""
+    assert_line --index 2 "STEP 3: COMMIT"
+    assert_line --index 3 --regexp "^--> [a-z0-9]*$"
+
+    run $TOOLBOX list
+
+    assert_success
+    assert_line --index 1 --partial "<none>"
+
+    rm -f "$BATS_TMPDIR"/Containerfile
 }

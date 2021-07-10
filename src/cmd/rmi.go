@@ -24,7 +24,6 @@ import (
 
 	"github.com/containers/toolbox/pkg/podman"
 	"github.com/containers/toolbox/pkg/utils"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -70,33 +69,13 @@ func rmi(cmd *cobra.Command, args []string) error {
 	}
 
 	if rmiFlags.deleteAll {
-		logrus.Debug("Fetching images with label=com.github.containers.toolbox=true")
-		args := []string{"--filter", "label=com.github.containers.toolbox=true"}
-		images_old, err := podman.GetImages(args...)
+		toolboxImages, err := getImages()
 		if err != nil {
-			return errors.New("failed to list images with label=com.github.containers.toolbox=true")
+			return err
 		}
 
-		logrus.Debug("Fetching images with label=com.github.debarshiray.toolbox=true")
-		args = []string{"--filter", "label=com.github.debarshiray.toolbox=true"}
-		images_new, err := podman.GetImages(args...)
-		if err != nil {
-			return errors.New("failed to list images with com.github.debarshiray.toolbox=true")
-		}
-
-		var idKey string
-		if podman.CheckVersion("2.0.0") {
-			idKey = "Id"
-		} else if podman.CheckVersion("1.8.3") {
-			idKey = "ID"
-		} else {
-			idKey = "id"
-		}
-
-		images := utils.JoinJSON(idKey, images_old, images_new)
-
-		for _, image := range images {
-			imageID := image[idKey].(string)
+		for _, image := range toolboxImages {
+			imageID := image.ID
 			if err := podman.RemoveImage(imageID, rmiFlags.forceDelete); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 				continue

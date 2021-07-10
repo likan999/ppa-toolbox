@@ -36,6 +36,7 @@ import (
 
 var (
 	initContainerFlags struct {
+		gid         int
 		home        string
 		homeLink    bool
 		mediaLink   bool
@@ -54,6 +55,7 @@ var (
 		{"/etc/machine-id", "/run/host/etc/machine-id", "ro"},
 		{"/run/libvirt", "/run/host/run/libvirt", ""},
 		{"/run/systemd/journal", "/run/host/run/systemd/journal", ""},
+		{"/run/systemd/resolve", "/run/host/run/systemd/resolve", ""},
 		{"/run/udev/data", "/run/host/run/udev/data", ""},
 		{"/tmp", "/run/host/tmp", "rslave"},
 		{"/var/lib/flatpak", "/run/host/var/lib/flatpak", "ro"},
@@ -73,6 +75,11 @@ var initContainerCmd = &cobra.Command{
 
 func init() {
 	flags := initContainerCmd.Flags()
+
+	flags.IntVar(&initContainerFlags.gid,
+		"gid",
+		0,
+		"Create a user inside the toolbox container whose numerical group ID is GID")
 
 	flags.StringVar(&initContainerFlags.home,
 		"home",
@@ -127,6 +134,10 @@ func initContainer(cmd *cobra.Command, args []string) error {
 
 		errMsg := builder.String()
 		return errors.New(errMsg)
+	}
+
+	if !cmd.Flag("gid").Changed {
+		initContainerFlags.gid = initContainerFlags.uid
 	}
 
 	utils.EnsureXdgRuntimeDirIsSet(initContainerFlags.uid)
@@ -302,7 +313,7 @@ func initContainer(cmd *cobra.Command, args []string) error {
 
 	defer initializedStampFile.Close()
 
-	if err := initializedStampFile.Chown(initContainerFlags.uid, initContainerFlags.uid); err != nil {
+	if err := initializedStampFile.Chown(initContainerFlags.uid, initContainerFlags.gid); err != nil {
 		return errors.New("failed to change ownership of initialization stamp")
 	}
 
@@ -444,11 +455,22 @@ func mountBind(containerPath, source, flags string) error {
 		return fmt.Errorf("failed to stat %s", source)
 	}
 
-	if fi.IsDir() {
-		logrus.Debugf("Creating %s", containerPath)
+	fileMode := fi.Mode()
+
+	if fileMode.IsDir() {
+		logrus.Debugf("Creating directory %s", containerPath)
 		if err := os.MkdirAll(containerPath, 0755); err != nil {
-			return fmt.Errorf("failed to create %s", containerPath)
+			return fmt.Errorf("failed to create directory %s: %w", containerPath, err)
 		}
+	} else if fileMode.IsRegular() {
+		logrus.Debugf("Creating regular file %s", containerPath)
+
+		containerPathFile, err := os.Create(containerPath)
+		if err != nil && !os.IsExist(err) {
+			return fmt.Errorf("failed to create regular file %s: %w", containerPath, err)
+		}
+
+		defer containerPathFile.Close()
 	}
 
 	logrus.Debugf("Binding %s to %s", containerPath, source)

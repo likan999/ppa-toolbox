@@ -52,7 +52,7 @@ type Distro struct {
 
 const (
 	idTruncLength          = 12
-	releaseDefaultFallback = "32"
+	releaseDefaultFallback = "33"
 )
 
 const (
@@ -358,7 +358,7 @@ func GetFullyQualifiedImageFromDistros(image, release string) (string, error) {
 		return imageFull, nil
 	}
 
-	return "", fmt.Errorf("failed to resolve image %s")
+	return "", fmt.Errorf("failed to resolve image %s", image)
 }
 
 // GetGroupForSudo returns the name of the sudoers group.
@@ -447,15 +447,17 @@ func GetMountOptions(target string) (string, error) {
 
 	output := stdout.String()
 	options := strings.Split(output, "\n")
-	if len(options) != 2 {
-		return "", errors.New("unexpected output from findmnt(1)")
-	}
 
 	mountOptions := strings.TrimSpace(options[0])
 	return mountOptions, nil
 }
 
 func GetRuntimeDirectory(targetUser *user.User) (string, error) {
+	gid, err := strconv.Atoi(targetUser.Gid)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert group ID to integer: %w", err)
+	}
+
 	uid, err := strconv.Atoi(targetUser.Uid)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert user ID to integer: %w", err)
@@ -479,7 +481,7 @@ func GetRuntimeDirectory(targetUser *user.User) (string, error) {
 		return "", wrapped_err
 	}
 
-	if err := os.Chown(toolboxRuntimeDirectory, uid, uid); err != nil {
+	if err := os.Chown(toolboxRuntimeDirectory, uid, gid); err != nil {
 		wrapped_err := fmt.Errorf("failed to change ownership of the runtime directory %s: %w",
 			toolboxRuntimeDirectory,
 			err)

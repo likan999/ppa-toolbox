@@ -33,7 +33,10 @@ The toolbox environment is based on an [OCI](https://www.opencontainers.org/)
 image. On Fedora this is the `fedora-toolbox` image. This image is used to
 create a toolbox container that seamlessly integrates with the rest of the
 operating system by providing access to the user's home directory, the Wayland
-and X11 sockets, SSH agent, etc..
+and X11 sockets, networking (including Avahi), removable devices (like USB
+sticks), systemd journal, SSH agent, D-Bus, ulimits, /dev and the udev
+database, etc..
+
 
 ## Installation
 
@@ -86,7 +89,7 @@ It can be built and installed as any other typical Meson-based project:
 ```
 
 Toolbox is written in Go. Consult the
-[src/go.mod](https://github.com/containers/toolbox/blob/master/src/go.mod) file
+[src/go.mod](https://github.com/containers/toolbox/blob/main/src/go.mod) file
 for a full list of all the Go dependencies.
 
 By default, Toolbox uses Go modules and all the required Go packages are
@@ -133,6 +136,7 @@ Paths:
 * `/etc/hosts`: optional, if present not a bind mount
 * `/etc/krb5.conf.d`: directory, not a bind mount
 * `/etc/localtime`: optional, if present not a bind mount
+* `/etc/machine-id`: optional, not a bind mount
 * `/etc/resolv.conf`: optional, if present not a bind mount
 * `/etc/timezone`: optional, if present not a bind mount
 

@@ -34,6 +34,7 @@ type toolboxImage struct {
 	ID      string
 	Names   []string
 	Created string
+	Labels  map[string]string
 }
 
 type toolboxContainer struct {
@@ -42,12 +43,19 @@ type toolboxContainer struct {
 	Status  string
 	Created string
 	Image   string
+	Labels  map[string]string
 }
 
 var (
 	listFlags struct {
 		onlyContainers bool
 		onlyImages     bool
+	}
+
+	// toolboxLabels holds labels used by containers/images that mark them as compatible with Toolbox
+	toolboxLabels = map[string]string{
+		"com.github.debarshiray.toolbox": "true",
+		"com.github.containers.toolbox":  "true",
 	}
 )
 
@@ -103,14 +111,14 @@ func list(cmd *cobra.Command, args []string) error {
 	var err error
 
 	if lsImages {
-		images, err = listImages()
+		images, err = getImages()
 		if err != nil {
 			return err
 		}
 	}
 
 	if lsContainers {
-		containers, err = listContainers()
+		containers, err = getContainers()
 		if err != nil {
 			return err
 		}
@@ -120,36 +128,21 @@ func list(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func listContainers() ([]toolboxContainer, error) {
-	logrus.Debug("Fetching containers with label=com.github.containers.toolbox=true")
-	args := []string{"--all", "--filter", "label=com.github.containers.toolbox=true"}
-	containers_old, err := podman.GetContainers(args...)
+func getContainers() ([]toolboxContainer, error) {
+	logrus.Debug("Fetching all containers")
+	args := []string{"--all", "--sort", "names"}
+	containers, err := podman.GetContainers(args...)
 	if err != nil {
-		return nil, errors.New("failed to list containers with label=com.github.containers.toolbox=true")
+		logrus.Debugf("Fetching all containers failed: %s", err)
+		return nil, errors.New("failed to get containers")
 	}
 
-	logrus.Debug("Fetching containers with label=com.github.debarshiray.toolbox=true")
-	args = []string{"--all", "--filter", "label=com.github.debarshiray.toolbox=true"}
-	containers_new, err := podman.GetContainers(args...)
-	if err != nil {
-		return nil, errors.New("failed to list containers with label=com.github.debarshiray.toolbox=true")
-	}
-
-	var containers []map[string]interface{}
-	if podman.CheckVersion("2.0.0") {
-		containers = utils.JoinJSON("Id", containers_old, containers_new)
-		containers = utils.SortJSON(containers, "Names", true)
-	} else {
-		containers = utils.JoinJSON("ID", containers_old, containers_new)
-		containers = utils.SortJSON(containers, "Names", false)
-	}
-
-	// This section is a temporary solution that is here to prevent a major
-	// redesign of the way how toolbox containers are fetched.
-	// Remove this in Toolbox v0.2.0
 	var toolboxContainers []toolboxContainer
+
 	for _, container := range containers {
 		var c toolboxContainer
+		var isToolboxContainer bool = false
+
 		containerJSON, err := json.Marshal(container)
 		if err != nil {
 			logrus.Errorf("failed to marshal container: %v", err)
@@ -161,7 +154,17 @@ func listContainers() ([]toolboxContainer, error) {
 			logrus.Errorf("failed to unmarshal container: %v", err)
 			continue
 		}
-		toolboxContainers = append(toolboxContainers, c)
+
+		for label := range toolboxLabels {
+			if _, ok := c.Labels[label]; ok {
+				isToolboxContainer = true
+				break
+			}
+		}
+
+		if isToolboxContainer {
+			toolboxContainers = append(toolboxContainers, c)
+		}
 	}
 
 	return toolboxContainers, nil
@@ -188,39 +191,21 @@ func listHelp(cmd *cobra.Command, args []string) {
 	}
 }
 
-func listImages() ([]toolboxImage, error) {
-	logrus.Debug("Fetching images with label=com.github.containers.toolbox=true")
-	args := []string{"--filter", "label=com.github.containers.toolbox=true"}
-	images_old, err := podman.GetImages(args...)
+func getImages() ([]toolboxImage, error) {
+	logrus.Debug("Fetching all images")
+	args := []string{"--sort", "repository"}
+	images, err := podman.GetImages(args...)
 	if err != nil {
-		return nil, errors.New("failed to list images with label=com.github.containers.toolbox=true")
+		logrus.Debugf("Fetching all images failed: %s", err)
+		return nil, errors.New("failed to get images")
 	}
 
-	logrus.Debug("Fetching images with label=com.github.debarshiray.toolbox=true")
-	args = []string{"--filter", "label=com.github.debarshiray.toolbox=true"}
-	images_new, err := podman.GetImages(args...)
-	if err != nil {
-		return nil, errors.New("failed to list images with com.github.debarshiray.toolbox=true")
-	}
-
-	var images []map[string]interface{}
-	if podman.CheckVersion("2.0.0") {
-		images = utils.JoinJSON("Id", images_old, images_new)
-		images = utils.SortJSON(images, "Names", true)
-	} else if podman.CheckVersion("1.8.3") {
-		images = utils.JoinJSON("ID", images_old, images_new)
-		images = utils.SortJSON(images, "Names", true)
-	} else {
-		images = utils.JoinJSON("id", images_old, images_new)
-		images = utils.SortJSON(images, "names", true)
-	}
-
-	// This section is a temporary solution that is here to prevent a major
-	// redesign of the way how toolbox images are fetched.
-	// Remove this in Toolbox v0.2.0
 	var toolboxImages []toolboxImage
+
 	for _, image := range images {
 		var i toolboxImage
+		var isToolboxImage bool = false
+
 		imageJSON, err := json.Marshal(image)
 		if err != nil {
 			logrus.Errorf("failed to marshal toolbox image: %v", err)
@@ -232,7 +217,17 @@ func listImages() ([]toolboxImage, error) {
 			logrus.Errorf("failed to unmarshal toolbox image: %v", err)
 			continue
 		}
-		toolboxImages = append(toolboxImages, i)
+
+		for label := range toolboxLabels {
+			if _, ok := i.Labels[label]; ok {
+				isToolboxImage = true
+				break
+			}
+		}
+
+		if isToolboxImage {
+			toolboxImages = append(toolboxImages, i)
+		}
 	}
 
 	return toolboxImages, nil
@@ -244,9 +239,14 @@ func listOutput(images []toolboxImage, containers []toolboxContainer) {
 		fmt.Fprintf(writer, "%s\t%s\t%s\n", "IMAGE ID", "IMAGE NAME", "CREATED")
 
 		for _, image := range images {
+			imageName := "<none>"
+			if len(image.Names) != 0 {
+				imageName = image.Names[0]
+			}
+
 			fmt.Fprintf(writer, "%s\t%s\t%s\n",
 				utils.ShortID(image.ID),
-				image.Names[0],
+				imageName,
 				image.Created)
 		}
 
@@ -323,6 +323,7 @@ func (i *toolboxImage) UnmarshalJSON(data []byte) error {
 		ID      string
 		Names   []string
 		Created interface{}
+		Labels  map[string]string
 	}
 
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -341,6 +342,8 @@ func (i *toolboxImage) UnmarshalJSON(data []byte) error {
 		i.Created = utils.HumanDuration(int64(value))
 	}
 
+	i.Labels = raw.Labels
+
 	return nil
 }
 
@@ -352,6 +355,7 @@ func (c *toolboxContainer) UnmarshalJSON(data []byte) error {
 		State   interface{}
 		Created interface{}
 		Image   string
+		Labels  map[string]string
 	}
 
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -394,6 +398,7 @@ func (c *toolboxContainer) UnmarshalJSON(data []byte) error {
 		c.Created = utils.HumanDuration(int64(value))
 	}
 	c.Image = raw.Image
+	c.Labels = raw.Labels
 
 	return nil
 }

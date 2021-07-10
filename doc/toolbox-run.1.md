@@ -6,20 +6,21 @@ toolbox\-run - Run a command in an existing toolbox container
 ## SYNOPSIS
 **toolbox run** [*--container NAME* | *-c NAME*]
             [*--distro DISTRO* | *-d DISTRO*]
-            [*--no-tty* | *-T*] [*COMMAND*]
-            [*--release RELEASE* | *-r RELEASE*] [*COMMAND*]
+            [*--no-tty* | *-T*]
+            [*--release RELEASE* | *-r RELEASE*]
+            [*COMMAND*]
 
 ## DESCRIPTION
 
 Runs a command inside an existing toolbox container. The container should have
 been created using the `toolbox create` command.
 
+On Fedora, the default container is known as `fedora-toolbox-N`, where N is
+the release of the host. A specific container can be selected using the
+`--container` option.
+
 A toolbox container is an OCI container. Therefore, `toolbox run` is analogous
 to a `podman start` followed by a `podman exec`.
-
-By default, the toolbox containers are tagged with the version of the OS that
-corresponds to the content inside them. Their names are prefixed with the name
-of the base image and suffixed with the current user name.
 
 ## OPTIONS ##
 
@@ -67,4 +68,4 @@ $ toolbox run --container foo uptime
 
 ## SEE ALSO
 
-`buildah(1)`, `podman(1)`, `podman-exec(1)`, `podman-start(1)`
+`toolbox(1)`, `podman(1)`, `podman-exec(1)`, `podman-start(1)`

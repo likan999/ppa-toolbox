@@ -277,8 +277,19 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 	logrus.Debugf("%s canonicalized to %s", currentUser.HomeDir, homeDirEvaled)
 	homeDirMountArg := homeDirEvaled + ":" + homeDirEvaled + ":rslave"
 
+	bootMountFlags := "ro"
+	isBootReadWrite, err := isPathReadWrite("/boot")
+	if err != nil {
+		return err
+	}
+	if isBootReadWrite {
+		bootMountFlags = "rw"
+	}
+
+	bootMountArg := "/boot:/run/host/boot:" + bootMountFlags + ",rslave"
+
 	usrMountFlags := "ro"
-	isUsrReadWrite, err := isUsrReadWrite()
+	isUsrReadWrite, err := isPathReadWrite("/usr")
 	if err != nil {
 		return err
 	}
@@ -378,21 +389,19 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 	}
 
 	entryPoint := []string{
-		"toolbox", "--verbose",
+		"toolbox", "--log-level", "debug",
 		"init-container",
+		"--gid", currentUser.Gid,
 		"--home", currentUser.HomeDir,
+		"--shell", userShell,
+		"--uid", currentUser.Uid,
+		"--user", currentUser.Username,
+		"--monitor-host",
 	}
 
 	entryPoint = append(entryPoint, slashHomeLink...)
 	entryPoint = append(entryPoint, mediaLink...)
 	entryPoint = append(entryPoint, mntLink...)
-
-	entryPoint = append(entryPoint, []string{
-		"--monitor-host",
-		"--shell", userShell,
-		"--uid", currentUser.Uid,
-		"--user", currentUser.Username,
-	}...)
 
 	createArgs := []string{
 		"--log-level", logLevelString,
@@ -426,12 +435,12 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 	createArgs = append(createArgs, []string{
 		"--userns", usernsArg,
 		"--user", "root:root",
-		"--volume", "/boot:/run/host/boot:rslave",
 		"--volume", "/etc:/run/host/etc",
 		"--volume", "/dev:/dev:rslave",
 		"--volume", "/run:/run/host/run:rslave",
 		"--volume", "/tmp:/run/host/tmp:rslave",
 		"--volume", "/var:/run/host/var:rslave",
+		"--volume", bootMountArg,
 		"--volume", dbusSystemSocketMountArg,
 		"--volume", homeDirMountArg,
 		"--volume", toolboxPathMountArg,
@@ -477,6 +486,7 @@ func createContainer(container, image, release string, showCommandToEnter bool) 
 		return fmt.Errorf("failed to create container %s", container)
 	}
 
+	// The spinner must be stopped before showing the 'enter' hit below.
 	s.Stop()
 
 	if showCommandToEnter {
@@ -524,6 +534,10 @@ func getDBusSystemSocket() (string, error) {
 	path := addressSplit[1]
 	pathEvaled, err := filepath.EvalSymlinks(path)
 	if err != nil {
+		logrus.Debugf("Resolving path to the D-Bus system socket: failed to evaluate symbolic links in %s: %s",
+			path,
+			err)
+
 		return "", errors.New("failed to resolve the path to the D-Bus system socket")
 	}
 
@@ -592,6 +606,10 @@ func getServiceSocket(serviceName string, unitName string) (string, error) {
 
 	connection, err := dbus.SystemBus()
 	if err != nil {
+		logrus.Debugf("Resolving path to the %s socket: failed to connect to the D-Bus system instance: %s",
+			serviceName,
+			err)
+
 		return "", errors.New("failed to connect to the D-Bus system instance")
 	}
 
@@ -603,14 +621,17 @@ func getServiceSocket(serviceName string, unitName string) (string, error) {
 	var result map[string]dbus.Variant
 	err = call.Store(&result)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to get the properties of %s", unitName)
-		return "", errors.New(errMsg)
+		logrus.Debugf("Resolving path to the %s socket: failed to get the properties of %s: %s",
+			serviceName,
+			unitName,
+			err)
+
+		return "", fmt.Errorf("failed to get the properties of %s", unitName)
 	}
 
 	listenVariant, listenFound := result["Listen"]
 	if !listenFound {
-		errMsg := fmt.Sprintf("failed to find the Listen property of %s", unitName)
-		return "", errors.New(errMsg)
+		return "", fmt.Errorf("failed to find the Listen property of %s", unitName)
 	}
 
 	listenVariantSignature := listenVariant.Signature().String()
@@ -636,26 +657,25 @@ func getServiceSocket(serviceName string, unitName string) (string, error) {
 		}
 	}
 
-	errMsg := fmt.Sprintf("failed to find a SOCK_STREAM socket for %s", unitName)
-	return "", errors.New(errMsg)
+	return "", fmt.Errorf("failed to find a SOCK_STREAM socket for %s", unitName)
 }
 
-func isUsrReadWrite() (bool, error) {
-	logrus.Debug("Checking if /usr is mounted read-only or read-write")
+func isPathReadWrite(path string) (bool, error) {
+	logrus.Debugf("Checking if %s is mounted read-only or read-write", path)
 
-	mountPoint, err := utils.GetMountPoint("/usr")
+	mountPoint, err := utils.GetMountPoint(path)
 	if err != nil {
-		return false, fmt.Errorf("failed to get the mount-point of /usr: %s", err)
+		return false, fmt.Errorf("failed to get the mount-point of %s: %s", path, err)
 	}
 
-	logrus.Debugf("Mount-point of /usr is %s", mountPoint)
+	logrus.Debugf("Mount-point of %s is %s", path, mountPoint)
 
 	mountFlags, err := utils.GetMountOptions(mountPoint)
 	if err != nil {
 		return false, fmt.Errorf("failed to get the mount options of %s: %s", mountPoint, err)
 	}
 
-	logrus.Debugf("Mount flags of /usr on the host are %s", mountFlags)
+	logrus.Debugf("Mount flags of %s on the host are %s", path, mountFlags)
 
 	if !strings.Contains(mountFlags, "ro") {
 		return true, nil

@@ -45,7 +45,7 @@ var (
 
 	rootCmd = &cobra.Command{
 		Use:               "toolbox",
-		Short:             "Unprivileged development environment",
+		Short:             "Tool for containerized command line environments on Linux",
 		PersistentPreRunE: preRun,
 		RunE:              rootRun,
 		Version:           version.GetVersion(),
@@ -111,15 +111,7 @@ func preRun(cmd *cobra.Command, args []string) error {
 
 	if !utils.IsInsideContainer() {
 		logrus.Debugf("Running on a cgroups v%d host", cgroupsVersion)
-	}
 
-	toolboxPath := os.Getenv("TOOLBOX_PATH")
-
-	if utils.IsInsideContainer() {
-		if toolboxPath == "" {
-			return errors.New("TOOLBOX_PATH not set")
-		}
-	} else {
 		if currentUser.Uid != "0" {
 			logrus.Debugf("Checking if /etc/subgid and /etc/subuid have entries for user %s",
 				currentUser.Username)
@@ -132,13 +124,19 @@ func preRun(cmd *cobra.Command, args []string) error {
 				return newSubIDFileError()
 			}
 		}
-
-		if toolboxPath == "" {
-			os.Setenv("TOOLBOX_PATH", executable)
-		}
 	}
 
-	toolboxPath = os.Getenv("TOOLBOX_PATH")
+	toolboxPath := os.Getenv("TOOLBOX_PATH")
+
+	if toolboxPath == "" {
+		if utils.IsInsideContainer() {
+			return errors.New("TOOLBOX_PATH not set")
+		}
+
+		os.Setenv("TOOLBOX_PATH", executable)
+		toolboxPath = os.Getenv("TOOLBOX_PATH")
+	}
+
 	logrus.Debugf("TOOLBOX_PATH is %s", toolboxPath)
 
 	if err := migrate(); err != nil {
@@ -199,13 +197,16 @@ func rootUsage(cmd *cobra.Command) error {
 }
 
 func migrate() error {
+	logrus.Debug("Migrating to newer Podman")
+
 	if utils.IsInsideContainer() {
 		return nil
 	}
 
 	configDir, err := os.UserConfigDir()
 	if err != nil {
-		return fmt.Errorf("failed to get the user config directory")
+		logrus.Debugf("Migrating to newer Podman: failed to get the user config directory: %s", err)
+		return errors.New("failed to get the user config directory")
 	}
 
 	toolboxConfigDir := configDir + "/toolbox"
@@ -214,14 +215,19 @@ func migrate() error {
 
 	podmanVersion, err := podman.GetVersion()
 	if err != nil {
-		return fmt.Errorf("failed to get the Podman version")
+		logrus.Debugf("Migrating to newer Podman: failed to get the Podman version: %s", err)
+		return errors.New("failed to get the Podman version")
 	}
 
 	logrus.Debugf("Current Podman version is %s", podmanVersion)
 
 	err = os.MkdirAll(toolboxConfigDir, 0775)
 	if err != nil {
-		return fmt.Errorf("failed to create configuration directory")
+		logrus.Debugf("Migrating to newer Podman: failed to create configuration directory %s: %s",
+			toolboxConfigDir,
+			err)
+
+		return errors.New("failed to create configuration directory")
 	}
 
 	toolboxRuntimeDirectory, err := utils.GetRuntimeDirectory(currentUser)
@@ -233,7 +239,8 @@ func migrate() error {
 
 	migrateLockFile, err := os.Create(migrateLock)
 	if err != nil {
-		return fmt.Errorf("failed to create migration lock file")
+		logrus.Debugf("Migrating to newer Podman: failed to create migration lock file %s: %s", migrateLock, err)
+		return errors.New("failed to create migration lock file")
 	}
 
 	defer migrateLockFile.Close()
@@ -241,13 +248,15 @@ func migrate() error {
 	migrateLockFD := migrateLockFile.Fd()
 	migrateLockFDInt := int(migrateLockFD)
 	if err := syscall.Flock(migrateLockFDInt, syscall.LOCK_EX); err != nil {
-		return fmt.Errorf("failed to acquire migration lock")
+		logrus.Debugf("Migrating to newer Podman: failed to acquire migration lock on %s: %s", migrateLock, err)
+		return errors.New("failed to acquire migration lock")
 	}
 
 	stampBytes, err := ioutil.ReadFile(stampPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to read migration stamp file")
+			logrus.Debugf("Migrating to newer Podman: failed to read migration stamp file %s: %s", stampPath, err)
+			return errors.New("failed to read migration stamp file")
 		}
 	} else {
 		stampString := string(stampBytes)
@@ -270,7 +279,8 @@ func migrate() error {
 	}
 
 	if err = podman.SystemMigrate(""); err != nil {
-		return fmt.Errorf("failed to migrate containers")
+		logrus.Debugf("Migrating to newer Podman: failed to migrate containers: %s", err)
+		return errors.New("failed to migrate containers")
 	}
 
 	logrus.Debugf("Migration to Podman version %s was ok", podmanVersion)
@@ -279,7 +289,11 @@ func migrate() error {
 	podmanVersionBytes := []byte(podmanVersion + "\n")
 	err = ioutil.WriteFile(stampPath, podmanVersionBytes, 0664)
 	if err != nil {
-		return fmt.Errorf("failed to update Podman version in migration stamp file")
+		logrus.Debugf("Migrating to newer Podman: failed to update Podman version in migration stamp file %s: %s",
+			stampPath,
+			err)
+
+		return errors.New("failed to update Podman version in migration stamp file")
 	}
 
 	return nil
@@ -301,30 +315,30 @@ func setUpGlobals() error {
 	if !utils.IsInsideContainer() {
 		cgroupsVersion, err = utils.GetCgroupsVersion()
 		if err != nil {
-			return errors.New("failed to get the cgroups version")
+			return fmt.Errorf("failed to get the cgroups version: %w", err)
 		}
 	}
 
 	currentUser, err = user.Current()
 	if err != nil {
-		return errors.New("failed to get the current user")
+		return fmt.Errorf("failed to get the current user: %w", err)
 	}
 
 	executable, err = os.Executable()
 	if err != nil {
-		return errors.New("failed to get the path to the executable")
+		return fmt.Errorf("failed to get the path to the executable: %w", err)
 	}
 
 	executable, err = filepath.EvalSymlinks(executable)
 	if err != nil {
-		return errors.New("failed to resolve absolute path to the executable")
+		return fmt.Errorf("failed to resolve absolute path to the executable: %w", err)
 	}
 
 	executableBase = filepath.Base(executable)
 
 	workingDirectory, err = os.Getwd()
 	if err != nil {
-		return errors.New("failed to get the working directory")
+		return fmt.Errorf("failed to get the working directory: %w", err)
 	}
 
 	return nil
@@ -342,7 +356,7 @@ func setUpLoggers() error {
 
 	logLevel, err := logrus.ParseLevel(rootFlags.logLevel)
 	if err != nil {
-		return errors.New("failed to parse log-level")
+		return fmt.Errorf("failed to parse log-level: %w", err)
 	}
 
 	logrus.SetLevel(logLevel)
@@ -359,8 +373,11 @@ func setUpLoggers() error {
 }
 
 func validateSubIDFile(path string) (bool, error) {
+	logrus.Debugf("Validating sub-ID file %s", path)
+
 	file, err := os.Open(path)
 	if err != nil {
+		logrus.Debugf("Validating sub-ID file: failed to open %s: %s", path, err)
 		return false, fmt.Errorf("failed to open %s", path)
 	}
 
